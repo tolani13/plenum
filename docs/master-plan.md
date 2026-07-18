@@ -20,6 +20,10 @@ Product-level plan. All phase units reference this file and the spec
 - Verification: Tier 3 — adversarial matrix (rep cross-territory denial on
   every endpoint, no-GUC zero rows, mv grant denial as plenum_app) + P1-1/
   P1-2 + rollup-vs-live equivalence + determinism anchors unchanged.
+- Amendment 2026-07-18 (D.'s order, pre-acceptance): API port 8080 → 5777,
+  default bind 127.0.0.1 — the parked port-move decision executed; bank
+  demo keeps 8080, no contention. (The P0 entry's "API on 8080" line below
+  is dated history and stands as written.)
 - Update at merge: [CC appends acceptance + merge line on D.'s "merge"]
 
 ## 2026-07-17 — P0 Foundation: built, audited, accepted

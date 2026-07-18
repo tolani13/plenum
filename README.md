@@ -28,12 +28,12 @@ per materialized view. No UI (that is P2).
   2026-07-17). Every `docker compose exec db psql …` command runs *inside*
   the container and is unaffected. Only the connection strings in `.env`
   carry 5434.
-- **API: 8080.** Shared serially with the Local-Secure-Ops bank demo
-  (`stack-ledger-api.exe`) — a separate project actively worked by another
-  agent (Codex). Run one at a time. If `cargo run --bin api` reports
-  "cannot bind 0.0.0.0:8080", the bank demo is up: that is port contention,
-  not a PLENUM failure. PLENUM sessions never stop or touch the bank demo's
-  process; D. decides any port change.
+- **API: 127.0.0.1:5777** (D.'s call, 2026-07-18). PLENUM owns 5777; the
+  Local-Secure-Ops bank demo (`stack-ledger-api.exe`, another agent's active
+  project) keeps 8080 — no contention, the two run side by side. The
+  never-touch rule for other agents' processes and folders still stands:
+  PLENUM sessions never stop or modify the bank demo, ever. Loopback bind
+  by default — the demo API is not exposed off-machine.
 
 ## Run it (three commands)
 
@@ -76,15 +76,15 @@ docker compose exec db psql -U plenum_admin -d plenum -c "SELECT count(*) FROM o
 cargo run --bin api
 
 # 4 — RLS breach check FIRST, rep side (expect: SE-1 only, items 6, total 6)
-Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/login -ContentType "application/json" -Body '{"email":"serena.estes@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable rep
-(Invoke-RestMethod -Uri "http://localhost:8080/api/accounts?limit=200" -WebSession $rep).items.territory_code | Sort-Object -Unique
+Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/auth/login -ContentType "application/json" -Body '{"email":"serena.estes@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable rep
+(Invoke-RestMethod -Uri "http://localhost:5777/api/accounts?limit=200" -WebSession $rep).items.territory_code | Sort-Object -Unique
 
 # 5 — VP side (expect all 8 codes: CE-1 CW-1 MT-1 MW-1 NE-1 SC-1 SE-1 W-1)
-Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/login -ContentType "application/json" -Body '{"email":"valerie.price@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable vp
-(Invoke-RestMethod -Uri "http://localhost:8080/api/accounts?limit=200" -WebSession $vp).items.territory_code | Sort-Object -Unique
+Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/auth/login -ContentType "application/json" -Body '{"email":"valerie.price@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable vp
+(Invoke-RestMethod -Uri "http://localhost:5777/api/accounts?limit=200" -WebSession $vp).items.territory_code | Sort-Object -Unique
 
 # 6 — no login, no data (expect HTTP/1.1 401 + JSON error, not a data list)
-curl.exe -i http://localhost:8080/api/accounts
+curl.exe -i http://localhost:5777/api/accounts
 
 # 7 — survives restart (expect 17353 again, no re-seed)
 docker compose restart
@@ -100,30 +100,26 @@ Prereqs: DB up, seeded, API running (the three commands above), run in the
 repo folder. Checks 1–2 need a fresh PowerShell window if `$rep`/`$vp`
 don't exist yet.
 
-⚠ **Before starting the API:** make sure the bank demo
-(`stack-ledger-api.exe`) is NOT running. It binds `127.0.0.1:8080`
-specifically, which means PLENUM can appear to start cleanly on
-`0.0.0.0:8080` while every `localhost:8080` request still reaches the bank
-demo. One API at a time, as always — and never stop the bank demo without
-D.'s say-so; it is another agent's active project.
+PLENUM listens on `127.0.0.1:5777`; the bank demo keeps 8080. No port
+contention — the bank demo can stay up, untouched, while these checks run.
 
 ```powershell
 # 1 — SCOPE BREACH CHECK FIRST (rep must see exactly one territory)
-Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/login -ContentType "application/json" -Body '{"email":"serena.estes@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable rep
-(Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $rep).items.territory_code
+Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/auth/login -ContentType "application/json" -Body '{"email":"serena.estes@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable rep
+(Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $rep).items.territory_code
 # EXPECTED: exactly one line: SE-1
 # FAIL LOOKS LIKE: any other code, or more than one line -> scope breach —
 # stop everything and report. (An error message instead = feature broken, different failure.)
 
 # 2 — VP sees all eight
-Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/login -ContentType "application/json" -Body '{"email":"valerie.price@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable vp
-(Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $vp).items.territory_code | Sort-Object
+Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/auth/login -ContentType "application/json" -Body '{"email":"valerie.price@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable vp
+(Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $vp).items.territory_code | Sort-Object
 # EXPECTED: 8 lines: CE-1 CW-1 MT-1 MW-1 NE-1 SC-1 SE-1 W-1
 # FAIL LOOKS LIKE: fewer than 8, or an error.
 
 # 3 — GATE P1-1: the basis toggle re-ranks the top customers (spec §11 verbatim)
-$g = (Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/customers?period=2025&basis=gross&limit=10" -WebSession $vp).items
-$n = (Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/customers?period=2025&basis=net&limit=10" -WebSession $vp).items
+$g = (Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/customers?period=2025&basis=gross&limit=10" -WebSession $vp).items
+$n = (Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/customers?period=2025&basis=net&limit=10" -WebSession $vp).items
 "ORDER DIFFERS: " + (([string]::Join('|',$g.account_name)) -ne ([string]::Join('|',$n.account_name)))
 "ALL GROSS >= NET: " + (@($g + $n | Where-Object { $_.gross_cents -lt $_.net_cents }).Count -eq 0)
 "SAME TOP-10 SET: " + (-not (Compare-Object ($g.account_name | Sort-Object) ($n.account_name | Sort-Object)))
@@ -135,7 +131,7 @@ $n = (Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/customers?period
 # ALL GROSS >= NET: False (a net number exceeds its gross — money math wrong).
 
 # 4 — GATE P1-2: the API's cumulative net equals the raw ledger (spec §11 verbatim)
-$t = (Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $vp).items
+$t = (Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $vp).items
 "API TOTAL:   " + [int64](($t | Measure-Object -Property net_cents -Sum).Sum)
 docker compose exec db psql -U plenum_admin -d plenum -t -c "SELECT 'LEDGER TOTAL: ' || SUM(net_unit_cents * qty)::bigint FROM order_lines;"
 # EXPECTED: the two numbers are IDENTICAL, digit for digit.
@@ -143,23 +139,23 @@ docker compose exec db psql -U plenum_admin -d plenum -t -c "SELECT 'LEDGER TOTA
 # that is a stop-and-report, not a rounding footnote.
 
 # 5 — No login, no numbers
-curl.exe -i "http://localhost:8080/api/metrics/leaderboard?period=2025&basis=net"
+curl.exe -i "http://localhost:5777/api/metrics/leaderboard?period=2025&basis=net"
 # EXPECTED: HTTP/1.1 401 + the same JSON error envelope as P0's check 6 — not data.
 # FAIL LOOKS LIKE: 200 with items, or a crash/stack trace.
 
 # 6 — Garbage in, typed error out  (try/catch form — works on Windows
 #     PowerShell 5.1 AND PowerShell 7)
-try { Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/customers?period=2025&basis=vibes" -WebSession $vp } catch { "STATUS: " + $_.Exception.Response.StatusCode.value__; "BODY: " + $_.ErrorDetails.Message }
+try { Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/customers?period=2025&basis=vibes" -WebSession $vp } catch { "STATUS: " + $_.Exception.Response.StatusCode.value__; "BODY: " + $_.ErrorDetails.Message }
 # EXPECTED: STATUS: 422 and a BODY saying basis must be gross|net.
 # FAIL LOOKS LIKE: data comes back (no error at all), or STATUS 500.
 
 # 7 — Refresh is admin-only, and refreshing changes nothing it shouldn't
-try { Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/admin/refresh-rollups -WebSession $rep } catch { "STATUS: " + $_.Exception.Response.StatusCode.value__ }
+try { Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/admin/refresh-rollups -WebSession $rep } catch { "STATUS: " + $_.Exception.Response.StatusCode.value__ }
 # EXPECTED: STATUS: 403 (a rep may not refresh)
 # then log in as the ADMIN from the seed's login table (priya.nair@plenum.demo)
 # and repeat with that session:
-Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/login -ContentType "application/json" -Body '{"email":"priya.nair@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable adm
-Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/admin/refresh-rollups -WebSession $adm | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/auth/login -ContentType "application/json" -Body '{"email":"priya.nair@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable adm
+Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/admin/refresh-rollups -WebSession $adm | ConvertTo-Json -Depth 4
 # EXPECTED: 200 + per-matview row counts; re-run check 4 -> numbers still IDENTICAL.
 # FAIL LOOKS LIKE: 200 as rep (privilege hole), or check 4 diverging after
 # refresh (rollups drifting from the ledger).

@@ -76,6 +76,12 @@ One entry per build unit. Newest first.
   stands; D.'s acceptance run needs the bank demo stopped first. Internal
   verification ran on BIND_ADDR=127.0.0.1:18080 (env override only; no
   config change — the project stays on 8080).
+- **Amendment (D.'s order, 2026-07-18, pre-acceptance):** API port moved
+  8080 → **5777**, default bind 0.0.0.0 → **127.0.0.1** — executing the
+  parked port-move decision (authorized once the bank demo proved real; the
+  loopback-collision finding above was the trigger). PLENUM owns 5777, the
+  bank demo keeps 8080, no contention; never-touch rule unchanged. Code
+  delta: BIND_ADDR default in api/main.rs + .env.example only.
 - **Phase gate: P1 pending D.'s acceptance run** (7 checks, README §P1).
 - **Commit:** `626d920` on `p1-metrics` (this log line added in the
   immediate follow-up commit).
