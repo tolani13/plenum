@@ -3,8 +3,8 @@
 CRM for the installed-base business — Camfil APC audition artifact.
 Source of truth: [docs/plenum-crm-01.md](docs/plenum-crm-01.md) (spec v01).
 
-**Phase state: P0 merged to main (D. acceptance 7/7 PASS). P1 (Metrics
-core) built on `p1-metrics`, pending D.'s acceptance. P2+ not started.**
+**Phase state: P0 and P1 merged to main (P0: D. acceptance 7/7 PASS;
+P1: accepted + merged on D.'s "merge", 2026-07-18). P2+ not started.**
 P0 = repo scaffold, Postgres schema + Row-Level Security + audit triggers,
 deterministic seed engine, session auth, RLS session middleware, `GET
 /api/accounts`. P1 = the derived analytics layer (`v_order_facts` +

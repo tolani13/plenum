@@ -82,9 +82,13 @@ One entry per build unit. Newest first.
   loopback-collision finding above was the trigger). PLENUM owns 5777, the
   bank demo keeps 8080, no contention; never-touch rule unchanged. Code
   delta: BIND_ADDR default in api/main.rs + .env.example only.
-- **Phase gate: P1 pending D.'s acceptance run** (7 checks, README §P1).
+- **Phase gate: P1 ACCEPTED** — D.'s literal "merge" order, 2026-07-18
+  (merge = approval per this unit's protocol), following D.'s acceptance
+  run against 127.0.0.1:5777.
 - **Commit:** `626d920` on `p1-metrics` (this log line added in the
-  immediate follow-up commit).
+  immediate follow-up commit); amendment `2b34203`.
+- **Merge record:** `2f610ba` — p1-metrics merged to main (--no-ff),
+  2026-07-18 19:48:45 -0400, on D.'s "merge". Repo remains local-only.
 
 ## 2026-07-17 · P0 Foundation
 

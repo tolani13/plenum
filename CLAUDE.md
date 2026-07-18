@@ -1,7 +1,7 @@
 # PLENUM — repo working memory
 Source of truth: docs/plenum-crm-01.md (spec v01). Do not re-ask what it answers.
 Phase state: P0 merged to main d4f512d 2026-07-17 (D. acceptance 7/7 PASS).
-P1 Metrics core built on p1-metrics — awaiting D.'s acceptance + merge.
+P1 Metrics core merged to main 2f610ba 2026-07-18 on D.'s "merge".
 P2+ NOT started. Phase gate: D.'s explicit pass on the prior phase's
 acceptance checks — never start a phase without it.
 Non-negotiables: RLS in Postgres (API connects ONLY as plenum_app; admin conn is

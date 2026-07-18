@@ -2,7 +2,7 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-18 — P1 Metrics core: built, pending D.'s acceptance
+## [LATEST] 2026-07-18 — P1 Metrics core: built, accepted, merged
 - Derived layer: v_order_facts + v_unit_facts (security_invoker — definer
   views over RLS tables would bypass RLS; plenum_admin is superuser), four
   mv_* rollups keyed (entity, territory_id, quarter_start), scoped read
@@ -24,7 +24,9 @@ Product-level plan. All phase units reference this file and the spec
   default bind 127.0.0.1 — the parked port-move decision executed; bank
   demo keeps 8080, no contention. (The P0 entry's "API on 8080" line below
   is dated history and stands as written.)
-- Update at merge: [CC appends acceptance + merge line on D.'s "merge"]
+- Accepted + merged 2026-07-18: D.'s "merge" order (= approval per unit
+  protocol) after D.'s acceptance run against 127.0.0.1:5777; merge commit
+  2f610ba (--no-ff). Repo remains local-only.
 
 ## 2026-07-17 — P0 Foundation: built, audited, accepted
 - P0 delivered in 64e4c13 (52 files, +8041): full schema + RLS + audit
@@ -43,9 +45,7 @@ Product-level plan. All phase units reference this file and the spec
 
 ## Phase ladder (gate = D.'s pass on prior phase's §11 checks, always)
 - P0 Foundation — DONE (this entry).
-- P1 Metrics core — NEXT: v_order_facts, materialized rollups + refresh
-  endpoint, all 7 metric groups, dual-basis everywhere, pagination.
-  Gates P1-1/P1-2 (spec §11).
+- P1 Metrics core — DONE (this entry).
 - P2 Command + Leaderboards UI — login, shell, Territory Board, period/
   basis/kind controls, CSV export, responsive tripwire (Playwright, five
   widths) lands here.
@@ -65,3 +65,5 @@ report by walking acceptance checks, never internal tests alone.
 ## History
 - 2026-07-17 — P0 built (64e4c13); docs/coexistence rule (b93e3d3);
   master-plan created at closeout.
+- 2026-07-18 — P1 built on p1-metrics (626d920, port amendment 2b34203);
+  merged 2f610ba.
