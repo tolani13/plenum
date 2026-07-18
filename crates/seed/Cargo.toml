@@ -1,0 +1,16 @@
+[package]
+name = "seed"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+domain = { workspace = true }
+tokio = { workspace = true }
+sqlx = { workspace = true }
+rand = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+argon2 = { workspace = true }
+rust_decimal = { workspace = true }
+dotenvy = { workspace = true }

@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = ["crates/domain", "crates/api", "crates/seed"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.80"
+
+[workspace.dependencies]
+domain = { path = "crates/domain" }
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "json",
+    "migrate",
+    "rust_decimal",
+    "macros",
+] }
+tower-sessions = "0.14"
+argon2 = "0.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rand = "0.8"
+uuid = { version = "1", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = "1"
+dotenvy = "0.15"

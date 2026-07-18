@@ -1,0 +1,27 @@
+# PLENUM local development database.
+# Passwords in this file are DEV-ONLY — they never leave localhost and are not
+# reused anywhere. Production credentials would come from a secret store.
+services:
+  db:
+    image: postgres:16
+    container_name: plenum-db
+    environment:
+      POSTGRES_USER: plenum_admin
+      POSTGRES_PASSWORD: plenum_dev_admin_pw # dev-only
+      POSTGRES_DB: plenum
+    ports:
+      # Host port 5434: this machine's native PostgreSQL services own 5432/5433.
+      # Inside the container (and in every `docker compose exec db psql` command)
+      # the port is the standard 5432.
+      - "5434:5432"
+    volumes:
+      - plenum_pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plenum_admin -d plenum"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  plenum_pgdata:
