@@ -57,3 +57,13 @@ One entry per build unit. Newest first.
   fixed beyond P0 scope.
 - **Commit:** `64e4c13` on `p0-foundation` (this log line added in the
   immediate follow-up commit).
+- **2026-07-17 closeout:** D. acceptance 7/7 PASS. Cowork audit PASS
+  (evidence tier). master-plan.md added. Next: P1 unit from fresh Cowork
+  session (skill plenum-01).
+- **Bank-demo verification:** VERIFIED REAL: bank demo exists on this
+  machine; b93e3d3 record stands. (Fresh disk check at closeout:
+  stack-ledger-api.exe, Start-Bank-Demo.ps1, Check-Bank-Demo.ps1, and
+  bank-demo-startup.log all present; this session also observed the
+  process running from that exe before D.'s authorized stop.)
+- **Owed carry-forward:** CC owes untrimmed clippy output in next unit's
+  report.
