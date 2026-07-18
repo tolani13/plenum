@@ -1,0 +1,67 @@
+//! Typed errors, one envelope: { "error": { "code": ..., "message": ... } }
+//! with matching HTTP status. 401/403/404/422 are distinct; an empty result
+//! set is a normal 200, never an error.
+
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use axum::Json;
+use serde_json::json;
+
+#[derive(Debug, thiserror::Error)]
+pub enum ApiError {
+    #[error("{0}")]
+    Unauthorized(&'static str),
+    /// Reserved by the typed-error contract. P0 has no 403 path — RLS answers
+    /// out-of-scope reads with empty result sets, not errors. The first real
+    /// 403 lands with P1's role-gated admin refresh endpoint.
+    #[allow(dead_code)]
+    #[error("forbidden")]
+    Forbidden,
+    #[error("not found")]
+    NotFound,
+    #[error("{0}")]
+    Invalid(String),
+    #[error("internal error")]
+    Internal,
+}
+
+impl ApiError {
+    /// Login failure — identical body for unknown email and wrong password,
+    /// so responses cannot be used to enumerate users.
+    pub fn bad_credentials() -> Self {
+        ApiError::Unauthorized("invalid email or password")
+    }
+
+    /// Missing or expired session.
+    pub fn no_session() -> Self {
+        ApiError::Unauthorized("authentication required")
+    }
+}
+
+impl From<sqlx::Error> for ApiError {
+    fn from(e: sqlx::Error) -> Self {
+        tracing::error!(error = %e, "database error");
+        ApiError::Internal
+    }
+}
+
+impl From<tower_sessions::session::Error> for ApiError {
+    fn from(e: tower_sessions::session::Error) -> Self {
+        tracing::error!(error = %e, "session store error");
+        ApiError::Internal
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        let (status, code) = match &self {
+            ApiError::Unauthorized(_) => (StatusCode::UNAUTHORIZED, "unauthorized"),
+            ApiError::Forbidden => (StatusCode::FORBIDDEN, "forbidden"),
+            ApiError::NotFound => (StatusCode::NOT_FOUND, "not_found"),
+            ApiError::Invalid(_) => (StatusCode::UNPROCESSABLE_ENTITY, "invalid"),
+            ApiError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
+        };
+        let body = json!({ "error": { "code": code, "message": self.to_string() } });
+        (status, Json(body)).into_response()
+    }
+}

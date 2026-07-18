@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.code AS \"code!\"\n           FROM v_user_scope s\n           JOIN territories t ON t.id = s.territory_id\n           WHERE s.user_id = $1\n           ORDER BY t.code",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "code!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8c61389cb7ce8010e4095ee2f0d1d0418dc6a2a8a5adfd5205be0c8e71ab26b4"
+}
