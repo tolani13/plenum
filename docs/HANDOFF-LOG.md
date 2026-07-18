@@ -67,3 +67,6 @@ One entry per build unit. Newest first.
   process running from that exe before D.'s authorized stop.)
 - **Owed carry-forward:** CC owes untrimmed clippy output in next unit's
   report.
+- **Merge record:** `d4f512d` — p0-foundation merged to main (--no-ff),
+  2026-07-17 22:47:10 -0400, on D.'s "merge". Repo remains local-only
+  (no remote configured).
