@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT CASE WHEN discount_pct < 5 THEN '0-5'\n                       WHEN discount_pct < 10 THEN '5-10'\n                       WHEN discount_pct < 15 THEN '10-15'\n                       WHEN discount_pct < 20 THEN '15-20'\n                       WHEN discount_pct < 25 THEN '20-25'\n                       ELSE '>25' END AS \"bucket!\",\n                  count(*) AS \"line_count!\"\n           FROM v_order_facts\n           WHERE ($1::date IS NULL OR ordered_on >= $1)\n             AND ($2::date IS NULL OR ordered_on < $2)\n             AND (NOT $3::boolean\n                  OR ordered_on >= CURRENT_DATE - interval '12 months')\n             AND ($4::text = 'all' OR kind::text = $4)\n           GROUP BY 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "bucket!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "line_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Bool",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "4cc78569c46b6ca6c45cf1a49b02582287102244ace552393e1b20d717a83750"
+}

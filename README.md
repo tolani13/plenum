@@ -3,10 +3,16 @@
 CRM for the installed-base business — Camfil APC audition artifact.
 Source of truth: [docs/plenum-crm-01.md](docs/plenum-crm-01.md) (spec v01).
 
-**Phase state: P0 (Foundation) built. P1+ not started.**
+**Phase state: P0 merged to main (D. acceptance 7/7 PASS). P1 (Metrics
+core) built on `p1-metrics`, pending D.'s acceptance. P2+ not started.**
 P0 = repo scaffold, Postgres schema + Row-Level Security + audit triggers,
 deterministic seed engine, session auth, RLS session middleware, `GET
-/api/accounts`. No UI.
+/api/accounts`. P1 = the derived analytics layer (`v_order_facts` +
+`v_unit_facts`, four materialized rollups + scoped read views) and the seven
+metric endpoint groups under `/api/metrics/*`, dual-basis (gross/net) in
+every payload, plus `POST /api/admin/refresh-rollups` (admin-only). The
+seed now refreshes the rollups after loading and prints one row-count line
+per materialized view. No UI (that is P2).
 
 ---
 
@@ -87,6 +93,77 @@ docker compose exec db psql -U plenum_admin -d plenum -c "SELECT count(*) FROM o
 
 If check 4 shows any code other than `SE-1`: **RLS breach — stop everything
 and report it.**
+
+## P1 acceptance checks (PowerShell, paste-and-run)
+
+Prereqs: DB up, seeded, API running (the three commands above), run in the
+repo folder. Checks 1–2 need a fresh PowerShell window if `$rep`/`$vp`
+don't exist yet.
+
+⚠ **Before starting the API:** make sure the bank demo
+(`stack-ledger-api.exe`) is NOT running. It binds `127.0.0.1:8080`
+specifically, which means PLENUM can appear to start cleanly on
+`0.0.0.0:8080` while every `localhost:8080` request still reaches the bank
+demo. One API at a time, as always — and never stop the bank demo without
+D.'s say-so; it is another agent's active project.
+
+```powershell
+# 1 — SCOPE BREACH CHECK FIRST (rep must see exactly one territory)
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/login -ContentType "application/json" -Body '{"email":"serena.estes@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable rep
+(Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $rep).items.territory_code
+# EXPECTED: exactly one line: SE-1
+# FAIL LOOKS LIKE: any other code, or more than one line -> scope breach —
+# stop everything and report. (An error message instead = feature broken, different failure.)
+
+# 2 — VP sees all eight
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/login -ContentType "application/json" -Body '{"email":"valerie.price@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable vp
+(Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $vp).items.territory_code | Sort-Object
+# EXPECTED: 8 lines: CE-1 CW-1 MT-1 MW-1 NE-1 SC-1 SE-1 W-1
+# FAIL LOOKS LIKE: fewer than 8, or an error.
+
+# 3 — GATE P1-1: the basis toggle re-ranks the top customers (spec §11 verbatim)
+$g = (Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/customers?period=2025&basis=gross&limit=10" -WebSession $vp).items
+$n = (Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/customers?period=2025&basis=net&limit=10" -WebSession $vp).items
+"ORDER DIFFERS: " + (([string]::Join('|',$g.account_name)) -ne ([string]::Join('|',$n.account_name)))
+"ALL GROSS >= NET: " + (@($g + $n | Where-Object { $_.gross_cents -lt $_.net_cents }).Count -eq 0)
+"SAME TOP-10 SET: " + (-not (Compare-Object ($g.account_name | Sort-Object) ($n.account_name | Sort-Object)))
+# EXPECTED: ORDER DIFFERS: True · ALL GROSS >= NET: True · SAME TOP-10 SET: True
+# (Spec expects the same accounts reordered. If SAME TOP-10 SET prints False
+# while ORDER DIFFERS is True, report it — that is the same fact in stronger
+# form, and the auditor rules on it; the hard failures are the other two.)
+# FAIL LOOKS LIKE: ORDER DIFFERS: False (toggle does nothing) or
+# ALL GROSS >= NET: False (a net number exceeds its gross — money math wrong).
+
+# 4 — GATE P1-2: the API's cumulative net equals the raw ledger (spec §11 verbatim)
+$t = (Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $vp).items
+"API TOTAL:   " + [int64](($t | Measure-Object -Property net_cents -Sum).Sum)
+docker compose exec db psql -U plenum_admin -d plenum -t -c "SELECT 'LEDGER TOTAL: ' || SUM(net_unit_cents * qty)::bigint FROM order_lines;"
+# EXPECTED: the two numbers are IDENTICAL, digit for digit.
+# FAIL LOOKS LIKE: any difference — the rollup layer is lying about money;
+# that is a stop-and-report, not a rounding footnote.
+
+# 5 — No login, no numbers
+curl.exe -i "http://localhost:8080/api/metrics/leaderboard?period=2025&basis=net"
+# EXPECTED: HTTP/1.1 401 + the same JSON error envelope as P0's check 6 — not data.
+# FAIL LOOKS LIKE: 200 with items, or a crash/stack trace.
+
+# 6 — Garbage in, typed error out  (try/catch form — works on Windows
+#     PowerShell 5.1 AND PowerShell 7)
+try { Invoke-RestMethod -Uri "http://localhost:8080/api/metrics/customers?period=2025&basis=vibes" -WebSession $vp } catch { "STATUS: " + $_.Exception.Response.StatusCode.value__; "BODY: " + $_.ErrorDetails.Message }
+# EXPECTED: STATUS: 422 and a BODY saying basis must be gross|net.
+# FAIL LOOKS LIKE: data comes back (no error at all), or STATUS 500.
+
+# 7 — Refresh is admin-only, and refreshing changes nothing it shouldn't
+try { Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/admin/refresh-rollups -WebSession $rep } catch { "STATUS: " + $_.Exception.Response.StatusCode.value__ }
+# EXPECTED: STATUS: 403 (a rep may not refresh)
+# then log in as the ADMIN from the seed's login table (priya.nair@plenum.demo)
+# and repeat with that session:
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/login -ContentType "application/json" -Body '{"email":"priya.nair@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable adm
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/admin/refresh-rollups -WebSession $adm | ConvertTo-Json -Depth 4
+# EXPECTED: 200 + per-matview row counts; re-run check 4 -> numbers still IDENTICAL.
+# FAIL LOOKS LIKE: 200 as rep (privilege hole), or check 4 diverging after
+# refresh (rollups drifting from the ledger).
+```
 
 ## Development
 

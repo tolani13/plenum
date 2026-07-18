@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT matview AS \"matview!\", row_count AS \"row_count!\"\n           FROM refresh_rollups()",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "matview!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "row_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "0c42a7b1833247e9c488f483526aa53958f92b44cb9141d34f94c30cdcbbea53"
+}

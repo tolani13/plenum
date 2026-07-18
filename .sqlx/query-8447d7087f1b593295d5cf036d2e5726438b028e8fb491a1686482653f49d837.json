@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(DISTINCT territory_id) AS \"count!\"\n               FROM v_territory_period\n               WHERE quarter_start >= $1 AND quarter_start < $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "8447d7087f1b593295d5cf036d2e5726438b028e8fb491a1686482653f49d837"
+}
