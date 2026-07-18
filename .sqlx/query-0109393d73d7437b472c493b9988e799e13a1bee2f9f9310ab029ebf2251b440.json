@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.rep_name AS \"rep_name!\",\n                      r.gross_cents AS \"gross_cents!\",\n                      r.net_cents AS \"net_cents!\",\n                      r.capital_gross_cents AS \"capital_gross_cents!\",\n                      r.capital_net_cents AS \"capital_net_cents!\",\n                      r.consumable_gross_cents AS \"consumable_gross_cents!\",\n                      r.consumable_net_cents AS \"consumable_net_cents!\",\n                      top.account_name AS \"top_account_name?\"\n               FROM (\n                   SELECT rep_id, rep_name,\n                          SUM(gross_cents)::bigint AS gross_cents,\n                          SUM(net_cents)::bigint AS net_cents,\n                          SUM(capital_gross_cents)::bigint AS capital_gross_cents,\n                          SUM(capital_net_cents)::bigint AS capital_net_cents,\n                          SUM(consumable_gross_cents)::bigint AS consumable_gross_cents,\n                          SUM(consumable_net_cents)::bigint AS consumable_net_cents\n                   FROM v_rep_period\n                   WHERE quarter_start >= $1 AND quarter_start < $2\n                   GROUP BY rep_id, rep_name\n               ) r\n               LEFT JOIN LATERAL (\n                   SELECT f.account_name\n                   FROM v_order_facts f\n                   WHERE f.rep_id = r.rep_id\n                     AND f.ordered_on >= $1 AND f.ordered_on < $2\n                   GROUP BY f.account_id, f.account_name\n                   ORDER BY CASE WHEN $3 = 'gross' THEN SUM(f.gross_cents)\n                                 ELSE SUM(f.net_cents) END DESC,\n                            f.account_name\n                   LIMIT 1\n               ) top ON true\n               ORDER BY CASE WHEN $3 = 'gross' THEN r.gross_cents\n                             ELSE r.net_cents END DESC,\n                        (r.gross_cents - r.net_cents)::numeric\n                            / NULLIF(r.gross_cents, 0) ASC NULLS LAST,\n                        r.rep_name\n               LIMIT $4 OFFSET $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rep_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "net_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "capital_gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "capital_net_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "consumable_gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "consumable_net_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "top_account_name?",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      true
+    ]
+  },
+  "hash": "0109393d73d7437b472c493b9988e799e13a1bee2f9f9310ab029ebf2251b440"
+}

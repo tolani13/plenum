@@ -11,10 +11,9 @@ use serde_json::json;
 pub enum ApiError {
     #[error("{0}")]
     Unauthorized(&'static str),
-    /// Reserved by the typed-error contract. P0 has no 403 path — RLS answers
-    /// out-of-scope reads with empty result sets, not errors. The first real
-    /// 403 lands with P1's role-gated admin refresh endpoint.
-    #[allow(dead_code)]
+    /// RLS answers out-of-scope READS with empty result sets, not errors;
+    /// 403 is for privileged ACTIONS a logged-in caller lacks the role for
+    /// (P1: POST /api/admin/refresh-rollups as a non-admin).
     #[error("forbidden")]
     Forbidden,
     #[error("not found")]

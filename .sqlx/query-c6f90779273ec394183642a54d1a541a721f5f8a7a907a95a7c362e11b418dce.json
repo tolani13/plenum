@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(DISTINCT account_id) AS \"count!\"\n               FROM v_customer_period\n               WHERE quarter_start >= $1 AND quarter_start < $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c6f90779273ec394183642a54d1a541a721f5f8a7a907a95a7c362e11b418dce"
+}

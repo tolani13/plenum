@@ -162,6 +162,19 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Err(format!("orders gate FAILED: {orders_total} <= 15000").into());
     }
 
+    // P1: populate the mv_* rollups through the same refresh_rollups()
+    // function the API's admin endpoint calls (seed connects as
+    // plenum_admin, so this is a plain REFRESH). Data generation above is
+    // untouched — rollups are derived, so determinism is unaffected.
+    println!("\nrollups refreshed via refresh_rollups():");
+    let rollups: Vec<(String, i64)> =
+        sqlx::query_as("SELECT matview, row_count FROM refresh_rollups()")
+            .fetch_all(&pool)
+            .await?;
+    for (matview, row_count) in &rollups {
+        println!("  {matview:<24}{row_count:>8} rows");
+    }
+
     println!(
         "\nLOGINS — password for every user: {}",
         people::DEMO_PASSWORD

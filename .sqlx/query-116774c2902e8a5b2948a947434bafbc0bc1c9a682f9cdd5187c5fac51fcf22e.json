@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT serial AS \"serial!\",\n                  site_label AS \"site!\",\n                  account_name AS \"account_name!\",\n                  territory_code AS \"territory_code!\",\n                  days_silent AS \"days_silent!\",\n                  expected_changeout_months AS \"expected_changeout_months!\",\n                  annual_consumable_value_cents AS \"annual_consumable_value_cents!\",\n                  score::float8 AS \"score!\"\n           FROM v_defection_risk\n           ORDER BY score DESC, serial\n           LIMIT $1 OFFSET $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "serial!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "site!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "account_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "days_silent!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "expected_changeout_months!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "annual_consumable_value_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "score!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "116774c2902e8a5b2948a947434bafbc0bc1c9a682f9cdd5187c5fac51fcf22e"
+}

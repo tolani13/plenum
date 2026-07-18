@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.territory_code AS \"territory_code!\",\n                      r.territory_name AS \"territory_name!\",\n                      r.quota_year_cents AS \"quota_year_cents!\",\n                      r.gross_cents AS \"gross_cents!\",\n                      r.net_cents AS \"net_cents!\",\n                      r.order_count AS \"order_count!\",\n                      act.active_accounts AS \"active_accounts!\"\n               FROM (\n                   SELECT territory_id, territory_code, territory_name,\n                          quota_year_cents,\n                          SUM(gross_cents)::bigint AS gross_cents,\n                          SUM(net_cents)::bigint AS net_cents,\n                          SUM(order_count)::bigint AS order_count\n                   FROM v_territory_period\n                   WHERE quarter_start >= $1 AND quarter_start < $2\n                   GROUP BY territory_id, territory_code, territory_name,\n                            quota_year_cents\n               ) r\n               JOIN (\n                   SELECT territory_id,\n                          count(DISTINCT account_id) AS active_accounts\n                   FROM v_order_facts\n                   WHERE ordered_on >= $1 AND ordered_on < $2\n                   GROUP BY territory_id\n               ) act ON act.territory_id = r.territory_id\n               ORDER BY CASE WHEN $3 = 'gross' THEN r.gross_cents\n                             ELSE r.net_cents END DESC,\n                        r.territory_code\n               LIMIT $4 OFFSET $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "territory_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "quota_year_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "net_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "order_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "active_accounts!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f0f7cf0d65edc9eef2b5c167ab59450d610d0a22454d0927290e2812e2786c70"
+}

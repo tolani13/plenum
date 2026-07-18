@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(DISTINCT rep_id) AS \"count!\"\n               FROM v_rep_period\n               WHERE quarter_start >= $1 AND quarter_start < $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2e433fee42f3c42e382c5cba564a27dd149528ee82362e64e8ce0ad76ab88040"
+}

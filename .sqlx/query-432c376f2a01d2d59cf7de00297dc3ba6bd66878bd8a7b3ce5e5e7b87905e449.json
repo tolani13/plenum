@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(DISTINCT u.territory_id) AS \"count!\"\n           FROM v_unit_facts u\n           WHERE u.cartridge_product_id IS NOT NULL\n             AND u.expected_changeout_months IS NOT NULL\n             AND u.last_filter_order_on IS NOT NULL\n             AND date_trunc('quarter',\n                     u.last_filter_order_on\n                     + u.expected_changeout_months * interval '1 month')\n                 = date_trunc('quarter', CURRENT_DATE::timestamp)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "432c376f2a01d2d59cf7de00297dc3ba6bd66878bd8a7b3ce5e5e7b87905e449"
+}

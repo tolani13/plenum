@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.rep_name AS \"rep_name!\",\n                      r.gross_cents AS \"gross_cents!\",\n                      r.net_cents AS \"net_cents!\",\n                      r.capital_gross_cents AS \"capital_gross_cents!\",\n                      r.capital_net_cents AS \"capital_net_cents!\",\n                      r.consumable_gross_cents AS \"consumable_gross_cents!\",\n                      r.consumable_net_cents AS \"consumable_net_cents!\",\n                      top.account_name AS \"top_account_name?\"\n               FROM (\n                   SELECT rep_id, rep_name,\n                          SUM(gross_cents)::bigint AS gross_cents,\n                          SUM(net_cents)::bigint AS net_cents,\n                          COALESCE(SUM(gross_cents) FILTER (WHERE kind = 'capital'), 0)::bigint AS capital_gross_cents,\n                          COALESCE(SUM(net_cents)   FILTER (WHERE kind = 'capital'), 0)::bigint AS capital_net_cents,\n                          COALESCE(SUM(gross_cents) FILTER (WHERE kind = 'consumable'), 0)::bigint AS consumable_gross_cents,\n                          COALESCE(SUM(net_cents)   FILTER (WHERE kind = 'consumable'), 0)::bigint AS consumable_net_cents\n                   FROM v_order_facts\n                   WHERE ($1::date IS NULL OR ordered_on >= $1)\n                     AND ($2::date IS NULL OR ordered_on < $2)\n                     AND (NOT $3::boolean\n                          OR ordered_on >= CURRENT_DATE - interval '12 months')\n                     AND ($4::text = 'all' OR kind::text = $4)\n                   GROUP BY rep_id, rep_name\n               ) r\n               LEFT JOIN LATERAL (\n                   SELECT f.account_name\n                   FROM v_order_facts f\n                   WHERE f.rep_id = r.rep_id\n                     AND ($1::date IS NULL OR f.ordered_on >= $1)\n                     AND ($2::date IS NULL OR f.ordered_on < $2)\n                     AND (NOT $3::boolean\n                          OR f.ordered_on >= CURRENT_DATE - interval '12 months')\n                     AND ($4::text = 'all' OR f.kind::text = $4)\n                   GROUP BY f.account_id, f.account_name\n                   ORDER BY CASE WHEN $5 = 'gross' THEN SUM(f.gross_cents)\n                                 ELSE SUM(f.net_cents) END DESC,\n                            f.account_name\n                   LIMIT 1\n               ) top ON true\n               ORDER BY CASE WHEN $5 = 'gross' THEN r.gross_cents\n                             ELSE r.net_cents END DESC,\n                        (r.gross_cents - r.net_cents)::numeric\n                            / NULLIF(r.gross_cents, 0) ASC NULLS LAST,\n                        r.rep_name\n               LIMIT $6 OFFSET $7",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rep_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "net_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "capital_gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "capital_net_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "consumable_gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "consumable_net_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "top_account_name?",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Bool",
+        "Text",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      true
+    ]
+  },
+  "hash": "f4ef718e66b6a43dea88d4e84468b5b6c9f62424b6d9902880ac47bb1a1d3e62"
+}

@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(DISTINCT product_id) AS \"count!\"\n                   FROM v_order_facts\n                   WHERE ($1::date IS NULL OR ordered_on >= $1)\n                     AND ($2::date IS NULL OR ordered_on < $2)\n                     AND (NOT $3::boolean\n                          OR ordered_on >= CURRENT_DATE - interval '12 months')\n                     AND ($4::text = 'all' OR kind::text = $4)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Bool",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e496a863bc7a29930efc8d713a2276595506a0143530b9b55472f711c83bb843"
+}

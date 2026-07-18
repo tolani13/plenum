@@ -4,6 +4,88 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-18 · P1 Metrics core
+
+- **Unit:** P1 Metrics core (v_order_facts + v_unit_facts, four mv_* rollups
+  + scoped read views + refresh_rollups(), 7 metric endpoint groups,
+  dual-basis, pagination) — branch `p1-metrics` from main a67bb39.
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+- **Architect resolutions recorded:** metric 7 ships as GET /metrics/defection
+  (spec §10 "all 7 groups" vs §7 six-route list); matview scoping = grant
+  boundary (no plenum_app grant on raw mv_*) + scoped views carrying the 0005
+  predicate verbatim; v_order_facts/v_unit_facts are security_invoker
+  (plenum_admin is superuser — definer views would bypass RLS); refresh via
+  SECURITY DEFINER refresh_rollups() gated by role=admin in the handler;
+  cumulative/ttm read v_order_facts directly, quarters/years read rollups.
+- **Shipped:**
+  - migrations/0008_order_facts.sql — v_order_facts + v_unit_facts, both
+    WITH (security_invoker = true); SELECT grants to plenum_app.
+  - migrations/0009_rollups.sql — mv_territory_period / mv_rep_period /
+    mv_product_period / mv_customer_period, keyed (entity, territory_id,
+    quarter_start), WITH NO DATA, unique key indexes, deliberately NO
+    plenum_app grants (the enforcement boundary).
+  - migrations/0010_scoped_reads.sql — v_territory_period / v_rep_period /
+    v_product_period / v_customer_period (definer views: 0005 v_user_scope
+    predicate verbatim on BOTH branches + live-current-quarter UNION ALL,
+    boundary pair on date_trunc('quarter', now())); v_defection_risk
+    (security_invoker, P4 reuses it); refresh_rollups() SECURITY DEFINER
+    (search_path pinned, EXECUTE revoked from PUBLIC, granted to
+    plenum_app); SELECT grants on the scoped views.
+  - crates/domain/src/period.rs — period/basis/kind grammar parser (pure
+    logic, 5 unit tests); domain lib.rs/Cargo.toml wiring (chrono from
+    workspace deps — no new dependency).
+  - crates/api/src/routes/metrics.rs — all 7 metric endpoint groups; static
+    sqlx queries only (bind-parameter CASE for basis/by, null-folded
+    kind/date filters); rollup path for quarter/year + kind=all, live
+    v_order_facts path for cumulative/ttm and kind-filtered slices.
+  - crates/api/src/routes/admin.rs — POST /api/admin/refresh-rollups,
+    role=admin gate before the definer call; 401/403 typed.
+  - crates/api/src/routes/mod.rs — eight new route registrations.
+  - crates/api/src/error.rs — Forbidden comment updated (P1 lands the first
+    real 403; variant no longer dead code).
+  - crates/api/tests/metrics_http.rs — 8 integration tests: rep scope on
+    every endpoint, VP/rep cent-equality, gate P1-1, rollup-vs-live year
+    sum, kind-slice zeroing, 401 everywhere, 14-case 422 matrix, refresh
+    role gate + stability.
+  - crates/seed/src/main.rs — ONLY seed change: post-load
+    refresh_rollups() call + one console line per matview with row count.
+  - README (P1 acceptance section), master-plan, CLAUDE.md, this log;
+    .sqlx regenerated (30 new query files).
+- **Checks status (internal, output pasted in the session report):**
+  clippy -D warnings UNTRIMMED pasted (debt carried from P0 closeout,
+  settled) · 22/22 tests (9 domain unit + 5 P0 HTTP + 8 P1 HTTP) · cargo
+  sqlx prepare --check clean · seed determinism: two runs, ORDERS TOTAL
+  17353 + checksums (orders 17353/11556020473, order_lines
+  25497/-166812187229) + matview row counts (120/195/1699/614) identical ·
+  adversarial matrix: rep GUC = SE-1-only on all 7 P1 views, no-GUC = 0
+  rows everywhere, garbage GUC = 0 rows, mv_* SELECT as plenum_app =
+  permission denied ×4, rep/VP SE-1 cent-equality · P1-1 PASS (ORDER
+  DIFFERS True, ALL GROSS>=NET True; SAME TOP-10 SET False — stronger form,
+  flagged for audit) · P1-2 PASS (2467089087 == 2467089087) ·
+  rollup-vs-live equivalence: 0 mismatched rows on all four scoped views ·
+  refresh: rep 403 / VP 403 / admin 200 + row counts, P1-2 unchanged after ·
+  restart survival PASS (no re-seed).
+- **Anchors for the record:** CUMULATIVE NET (all territories, VP view) =
+  2467089087 cents; same number from raw order_lines as plenum_admin =
+  2467089087 cents.
+- **Owed settled:** untrimmed clippy output pasted in this unit's report
+  (carried from P0 closeout).
+- **Machine note (report, don't fix):** the bank demo binds 127.0.0.1:8080
+  specifically, so PLENUM can bind 0.0.0.0:8080 at the same time and
+  localhost:8080 traffic still reaches the BANK DEMO. "One API at a time"
+  stands; D.'s acceptance run needs the bank demo stopped first. Internal
+  verification ran on BIND_ADDR=127.0.0.1:18080 (env override only; no
+  config change — the project stays on 8080).
+- **Amendment (D.'s order, 2026-07-18, pre-acceptance):** API port moved
+  8080 → **5777**, default bind 0.0.0.0 → **127.0.0.1** — executing the
+  parked port-move decision (authorized once the bank demo proved real; the
+  loopback-collision finding above was the trigger). PLENUM owns 5777, the
+  bank demo keeps 8080, no contention; never-touch rule unchanged. Code
+  delta: BIND_ADDR default in api/main.rs + .env.example only.
+- **Phase gate: P1 pending D.'s acceptance run** (7 checks, README §P1).
+- **Commit:** `626d920` on `p1-metrics` (this log line added in the
+  immediate follow-up commit).
+
 ## 2026-07-17 · P0 Foundation
 
 - **Unit:** P0 Foundation (repo scaffold, schema + RLS + audit triggers,

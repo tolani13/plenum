@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(DISTINCT family) AS \"count!\"\n                   FROM v_product_period\n                   WHERE quarter_start >= $1 AND quarter_start < $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e9c235e3ab78e7a7fc7d89971b74a10582c053c62138ef693da401a1197d2cde"
+}

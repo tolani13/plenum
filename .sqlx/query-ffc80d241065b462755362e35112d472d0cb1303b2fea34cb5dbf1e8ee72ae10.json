@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH due AS (\n               SELECT u.unit_id, u.site_id, u.account_id, u.territory_id,\n                      u.territory_code, u.territory_name,\n                      u.cartridge_product_id, u.cartridge_count,\n                      u.cartridge_list_unit_cents, u.cartridge_net_unit_cents\n               FROM v_unit_facts u\n               WHERE u.cartridge_product_id IS NOT NULL\n                 AND u.expected_changeout_months IS NOT NULL\n                 AND u.last_filter_order_on IS NOT NULL\n                 AND date_trunc('quarter',\n                         u.last_filter_order_on\n                         + u.expected_changeout_months * interval '1 month')\n                     = date_trunc('quarter', CURRENT_DATE::timestamp)\n           ),\n           flags AS (\n               SELECT d.*,\n                      (EXISTS (\n                           SELECT 1 FROM v_order_facts f\n                           WHERE f.site_id = d.site_id\n                             AND f.product_id = d.cartridge_product_id\n                             AND f.ordered_on\n                                 >= date_trunc('quarter', CURRENT_DATE)::date\n                       ) OR EXISTS (\n                           SELECT 1\n                           FROM quotes q\n                           JOIN opportunities o ON o.id = q.opportunity_id\n                           JOIN quote_lines ql ON ql.quote_id = q.id\n                           WHERE o.account_id = d.account_id\n                             AND ql.product_id = d.cartridge_product_id\n                             AND q.status IN ('draft', 'pending_approval',\n                                              'approved', 'sent')\n                             AND q.created_at >= date_trunc('quarter', now())\n                       )) AS covered\n               FROM due d\n           )\n           SELECT territory_code AS \"territory_code!\",\n                  territory_name AS \"territory_name!\",\n                  count(*) AS \"units_due!\",\n                  count(*) FILTER (WHERE covered) AS \"units_covered!\",\n                  SUM(cartridge_count::bigint * cartridge_list_unit_cents)::bigint\n                      AS \"projected_gross_cents!\",\n                  SUM(cartridge_count::bigint * cartridge_net_unit_cents)::bigint\n                      AS \"projected_net_cents!\"\n           FROM flags\n           GROUP BY territory_id, territory_code, territory_name\n           ORDER BY CASE WHEN $1 = 'gross'\n                         THEN SUM(cartridge_count::bigint * cartridge_list_unit_cents)\n                         ELSE SUM(cartridge_count::bigint * cartridge_net_unit_cents)\n                    END DESC,\n                    territory_code\n           LIMIT $2 OFFSET $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "territory_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "units_due!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "units_covered!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "projected_gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "projected_net_cents!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "ffc80d241065b462755362e35112d472d0cb1303b2fea34cb5dbf1e8ee72ae10"
+}

@@ -1,7 +1,9 @@
-//! Router assembly: the full P0 API surface and nothing more.
+//! Router assembly: the P0 surface plus P1's metrics + admin refresh.
 
 pub mod accounts;
+pub mod admin;
 pub mod auth;
+pub mod metrics;
 
 use axum::extract::Request;
 use axum::middleware::Next;
@@ -31,6 +33,14 @@ pub fn app(state: AppState, cookie_secure: bool) -> Router {
         .route("/api/auth/logout", post(auth::logout))
         .route("/api/auth/me", get(auth::me))
         .route("/api/accounts", get(accounts::list_accounts))
+        .route("/api/metrics/territories", get(metrics::territories))
+        .route("/api/metrics/leaderboard", get(metrics::leaderboard))
+        .route("/api/metrics/items", get(metrics::items))
+        .route("/api/metrics/customers", get(metrics::customers))
+        .route("/api/metrics/leakage", get(metrics::leakage))
+        .route("/api/metrics/coverage", get(metrics::coverage))
+        .route("/api/metrics/defection", get(metrics::defection))
+        .route("/api/admin/refresh-rollups", post(admin::refresh_rollups))
         .fallback(|| async { ApiError::NotFound })
         .layer(axum::middleware::from_fn(trace_requests))
         .layer(session_layer)

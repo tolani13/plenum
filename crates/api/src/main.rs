@@ -1,6 +1,6 @@
 //! PLENUM API binary. Connects ONLY as plenum_app (RLS applies), fails fast
 //! with a plain-language message when the database is absent or unseeded,
-//! serves on BIND_ADDR (default 0.0.0.0:8080), shuts down gracefully.
+//! serves on BIND_ADDR (default 127.0.0.1:5777), shuts down gracefully.
 
 use api::state::AppState;
 use api::{routes, DEFAULT_APP_URL};
@@ -32,7 +32,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             .parse::<bool>()
             .map_err(|_| "COOKIE_SECURE must be true or false")?,
     };
-    let bind_addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+    let bind_addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:5777".to_string());
 
     let pool = PgPoolOptions::new()
         .max_connections(8)
