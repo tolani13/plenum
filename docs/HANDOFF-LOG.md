@@ -14,8 +14,14 @@ One entry per build unit. Newest first.
 - **Machine adaptations (D.'s calls, 2026-07-17, in-session):**
   - DB host port **5434** → container 5432 (native PostgreSQL services own
     5432/5433 on D.'s machine). All in-container psql commands unaffected.
-  - Port 8080 freed by killing the leftover `stack-ledger-api.exe`
-    (Local-Secure-Ops bank demo) — D. authorized; PLENUM API keeps 8080.
+  - Port 8080 freed by stopping `stack-ledger-api.exe` (Local-Secure-Ops
+    bank demo) — D. authorized in-session; PLENUM API keeps 8080.
+    **Correction, same day:** that demo is Codex's ACTIVE project, not
+    leftover cruft. Standing rule from D.: PLENUM sessions leave the bank
+    demo (and Grok Build's work) alone — never stop/modify other agents'
+    processes or folders. 8080 is shared serially: run one API at a time;
+    a "cannot bind 0.0.0.0:8080" from PLENUM means the bank demo is up,
+    which is contention, not a P0 failure.
 - **Shipped:**
   - Cargo workspace: `crates/domain` (enums, bp-based money math + property
     test vs the SQL CHECK), `crates/api` (axum 0.8, tower-sessions 0.14

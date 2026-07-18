@@ -22,7 +22,12 @@ deterministic seed engine, session auth, RLS session middleware, `GET
   2026-07-17). Every `docker compose exec db psql …` command runs *inside*
   the container and is unaffected. Only the connection strings in `.env`
   carry 5434.
-- **API: 8080.**
+- **API: 8080.** Shared serially with the Local-Secure-Ops bank demo
+  (`stack-ledger-api.exe`) — a separate project actively worked by another
+  agent (Codex). Run one at a time. If `cargo run --bin api` reports
+  "cannot bind 0.0.0.0:8080", the bank demo is up: that is port contention,
+  not a PLENUM failure. PLENUM sessions never stop or touch the bank demo's
+  process; D. decides any port change.
 
 ## Run it (three commands)
 
