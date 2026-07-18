@@ -77,7 +77,8 @@ One entry per build unit. Newest first.
   verification ran on BIND_ADDR=127.0.0.1:18080 (env override only; no
   config change — the project stays on 8080).
 - **Phase gate: P1 pending D.'s acceptance run** (7 checks, README §P1).
-- **Commit:** recorded in the immediate follow-up commit (P0 precedent).
+- **Commit:** `626d920` on `p1-metrics` (this log line added in the
+  immediate follow-up commit).
 
 ## 2026-07-17 · P0 Foundation
 
