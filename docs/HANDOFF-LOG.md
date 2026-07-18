@@ -44,4 +44,5 @@ One entry per build unit. Newest first.
   P0 is not "passed" until then.**
 - **Out-of-scope observations:** logged in the session report only; nothing
   fixed beyond P0 scope.
-- **Commit:** (filled after commit — see the follow-up line below)
+- **Commit:** `64e4c13` on `p0-foundation` (this log line added in the
+  immediate follow-up commit).
