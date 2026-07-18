@@ -46,8 +46,13 @@ One entry per build unit. Newest first.
   identical across runs · DB-level RLS matrix (rep 6 / RM 22 / VP 48 / no-GUC
   0 / random-uuid 0 / admin negative control) · HTTP matrix (rep SE-1-only,
   VP 8 codes, 401 no-cookie, identical 401s for bad creds, 422 limit=500) ·
-  restart survival. **Awaiting D.'s own hands on the 7 acceptance checks —
-  P0 is not "passed" until then.**
+  restart survival.
+- **Phase gate: P0 ACCEPTED by D., 2026-07-17** ("I'm good with it then"),
+  on the basis of the pasted evidence report plus a live browser
+  demonstration (no-login 401 → rep sees SE-1 only → VP sees all 8
+  territories, identity proven via /api/auth/me at each step). D. waived
+  hands-on execution of the 7 checks — recorded as an evidence-based pass,
+  not a hands-on pass. Merge not yet ordered; `p0-foundation` unmerged.
 - **Out-of-scope observations:** logged in the session report only; nothing
   fixed beyond P0 scope.
 - **Commit:** `64e4c13` on `p0-foundation` (this log line added in the

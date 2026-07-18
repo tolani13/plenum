@@ -1,6 +1,8 @@
 # PLENUM — repo working memory
 Source of truth: docs/plenum-crm-01.md (spec v01). Do not re-ask what it answers.
-Phase state: P0 built; P1+ NOT started. Phase gate: D.'s explicit pass on the prior
+Phase state: P0 built and ACCEPTED by D. 2026-07-17 (evidence-based pass; hands-on
+checks waived). p0-foundation NOT yet merged to main — merge runs only on D.'s
+literal "merge". P1+ NOT started. Phase gate: D.'s explicit pass on the prior
 phase's acceptance checks — never start a phase without it.
 Non-negotiables: RLS in Postgres (API connects ONLY as plenum_app; admin conn is
 seed/migrations only) · money = BIGINT cents · typed errors 401/403/404/422, empty
