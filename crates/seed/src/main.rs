@@ -72,6 +72,13 @@ fn generate_world() -> World {
         "Ridgeline silence beat broken"
     );
 
+    // P3 opportunity book (R2). A SEPARATE StdRng — keyed by SEED xor'd with a
+    // documented constant — created and drawn AFTER every existing draw, so the
+    // master `rng` sequence (and every frozen order/unit anchor) is untouched.
+    let mut opp_rng = StdRng::seed_from_u64(util::SEED ^ story_beats::OPP_BOOK_STREAM_KEY);
+    let mut opportunities = vec![opp];
+    opportunities.extend(story_beats::build_opportunity_book(&mut opp_rng, &account_rows));
+
     World {
         territories,
         users,
@@ -81,7 +88,7 @@ fn generate_world() -> World {
         contacts,
         products: product_rows,
         units,
-        opportunities: vec![opp],
+        opportunities,
         quotes: vec![quote],
         quote_lines,
         orders: orders_out.orders,
@@ -160,6 +167,23 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nORDERS TOTAL: {orders_total} (gate: >15000)");
     if orders_total <= 15_000 {
         return Err(format!("orders gate FAILED: {orders_total} <= 15000").into());
+    }
+
+    // P3 opportunity-book anchors (R2): deterministic count, checksum, and
+    // per-stage distribution — re-checked at audit (precondition 6).
+    let (opp_total, opp_checksum): (i64, i64) = sqlx::query_as(
+        "SELECT count(*), COALESCE(sum(hashtext(id::text))::bigint, 0) FROM opportunities",
+    )
+    .fetch_one(&pool)
+    .await?;
+    println!("\nOPPORTUNITIES TOTAL: {opp_total} · checksum {opp_checksum}");
+    let stage_rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT stage::text, count(*) FROM opportunities GROUP BY stage ORDER BY stage",
+    )
+    .fetch_all(&pool)
+    .await?;
+    for (stage, n) in &stage_rows {
+        println!("  stage {stage:<14}{n:>4}");
     }
 
     // P1: populate the mv_* rollups through the same refresh_rollups()

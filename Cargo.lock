@@ -1552,6 +1552,7 @@ dependencies = [
  "dotenvy",
  "rand",
  "rust_decimal",
+ "serde_json",
  "sqlx",
  "tokio",
  "uuid",

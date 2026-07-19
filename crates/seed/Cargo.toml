@@ -8,6 +8,7 @@ rust-version.workspace = true
 domain = { workspace = true }
 tokio = { workspace = true }
 sqlx = { workspace = true }
+serde_json = { workspace = true } # already a project dependency (crates/api); binds the R3 verdict jsonb
 rand = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }

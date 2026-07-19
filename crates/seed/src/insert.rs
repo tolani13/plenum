@@ -172,9 +172,11 @@ pub async fn write_all(pool: &PgPool, w: &World) -> sqlx::Result<()> {
     });
     qb.build().execute(&mut *tx).await?;
 
-    // quotes (audit trigger fires)
+    // quotes (audit trigger fires). Includes the P3 (0011) columns; only the
+    // seeded Wes quote carries a backfilled verdict + submitted_at (R9).
     let mut qb = QueryBuilder::<Postgres>::new(
-        "INSERT INTO quotes (id, opportunity_id, status, approver_id, created_by, created_at) ",
+        "INSERT INTO quotes (id, opportunity_id, status, approver_id, created_by, created_at, \
+         submitted_at, decided_at, decision_reason, discount_policy_result) ",
     );
     qb.push_values(&w.quotes, |mut b, q| {
         b.push_bind(q.id)
@@ -182,7 +184,11 @@ pub async fn write_all(pool: &PgPool, w: &World) -> sqlx::Result<()> {
             .push_bind(q.status)
             .push_bind(q.approver_id)
             .push_bind(q.created_by)
-            .push_bind(q.created_at);
+            .push_bind(q.created_at)
+            .push_bind(q.submitted_at)
+            .push_bind(q.decided_at)
+            .push_bind(q.decision_reason.clone())
+            .push_bind(q.discount_policy_result.clone());
     });
     qb.build().execute(&mut *tx).await?;
 

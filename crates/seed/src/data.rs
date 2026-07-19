@@ -107,6 +107,12 @@ pub struct QuoteRow {
     pub approver_id: Option<Uuid>,
     pub created_by: Uuid,
     pub created_at: DateTime<Utc>,
+    // P3 (0011) additive columns. Only the seeded Wes quote carries a backfilled
+    // verdict + submitted_at so the VP inbox renders it complete (R9).
+    pub submitted_at: Option<DateTime<Utc>>,
+    pub decided_at: Option<DateTime<Utc>>,
+    pub decision_reason: Option<String>,
+    pub discount_policy_result: Option<serde_json::Value>,
 }
 
 pub struct QuoteLineRow {

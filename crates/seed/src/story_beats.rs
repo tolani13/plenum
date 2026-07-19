@@ -20,12 +20,13 @@
 //!      order line at 100% discount (net 0 — passes the price CHECK).
 
 use chrono::NaiveDate;
-use domain::{net_unit_cents, OppStage, QuoteStatus, UserRole};
+use domain::{net_unit_cents, ApprovalTier, DiscountPolicy, OppStage, QuoteStatus, UserRole};
 use rand::rngs::StdRng;
+use rust_decimal::Decimal;
 
 use crate::data::{AccountRow, OppRow, ProductRow, QuoteLineRow, QuoteRow, UnitRow, UserRow};
 use crate::products::{brand_code, idx_by_sku, COMPETITOR_BRANDS};
-use crate::util::{det_uuid, pick_i32, pick_i64};
+use crate::util::{add_days, det_uuid, pick_i32, pick_i64};
 
 // ── Beat 1: Ridgeline Grain goes silent ─────────────────────────────────────
 
@@ -176,6 +177,24 @@ pub fn build_pending_quote(
         expected_close: Some(NaiveDate::from_ymd_opt(2026, 8, 15).expect("valid date")),
         lost_reason: None,
     };
+    // R9 backfill: the worst line is 28%, so the verdict is VP-tier — derived
+    // through the SAME domain logic the API's submit handler uses (proving the
+    // seeded quote and a live-submitted one agree). submitted_at is set so the
+    // VP inbox renders this quote as a completed submission.
+    let policy = DiscountPolicy {
+        self_max_pct: Decimal::new(1000, 2),    // 10.00
+        manager_max_pct: Decimal::new(2500, 2), // 25.00
+    };
+    let worst = Decimal::new(PENDING_QUOTE_WORST_BP, 2); // 28.00
+    let tier = ApprovalTier::from_worst(worst, &policy);
+    let discount_policy_result = serde_json::json!({
+        "verdict": tier.verdict_code(),
+        "worst_line_discount_pct": worst.to_string(),
+        "self_max_pct": policy.self_max_pct.to_string(),
+        "manager_max_pct": policy.manager_max_pct.to_string(),
+        "outcome_status": "pending_approval",
+    });
+
     let quote = QuoteRow {
         id: quote_id,
         opportunity_id: opp_id,
@@ -187,8 +206,113 @@ pub fn build_pending_quote(
             .and_hms_opt(14, 30, 0)
             .expect("valid time")
             .and_utc(),
+        submitted_at: Some(
+            NaiveDate::from_ymd_opt(2026, 7, 10)
+                .expect("valid date")
+                .and_hms_opt(14, 35, 0)
+                .expect("valid time")
+                .and_utc(),
+        ),
+        decided_at: None, // still pending — no decision yet
+        decision_reason: None,
+        discount_policy_result: Some(discount_policy_result),
     };
     (opp, quote, lines)
+}
+
+// ── Beat 6 (P3): the deterministic opportunity book ─────────────────────────
+// Ruling R2. §9 seeded exactly ONE opportunity (beat 4); a kanban with one
+// card is not demoable. This book is generated from a SEPARATE StdRng stream
+// (keyed by the master SEED xor'd with OPP_BOOK_STREAM_KEY) and appended AFTER
+// every existing draw in main.rs, so the pre-existing streams — and every
+// frozen order/unit anchor — are byte-for-byte untouched.
+//
+// Beat 6 proper is the Ridgeline win-back: the ~$34k/yr annuity from the demo
+// script, seeded as an opportunity with NO quote attached (D. drafts it live —
+// that is gate P3-1). Every other opp is a plausible pipeline card. Stages are
+// lead→negotiation ONLY (no seeded won/lost — those are user actions).
+
+/// Separate RNG stream key for the opportunity book (R2). XOR'd with util::SEED.
+/// Documented so the isolation is auditable: change nothing before this and the
+/// anchors cannot move.
+pub const OPP_BOOK_STREAM_KEY: u64 = 0x0000_0003_0B00_C0DE; // "P3 opp book"
+
+/// Ridgeline win-back: ~$34k/yr cartridge annuity going to a will-fit
+/// competitor. SE-1, owner Serena, kind filter-program, stage qualified.
+pub const RIDGELINE_WINBACK_KIND: &str = "filter-program";
+pub const RIDGELINE_WINBACK_AMOUNT_CENTS: i64 = 3_400_000;
+
+/// The pipeline book: (account name, stage, kind, gross amount cents). Curated
+/// so the per-stage distribution is exact and auditable (precondition 6), while
+/// uuids + expected_close jitter come from the isolated stream. Every account
+/// here has ≥1 site (precondition 5) and its territory/owner are taken from the
+/// account row (R2: territory_id ALWAYS == the account's territory).
+const OPP_BOOK: [(&str, OppStage, &str, i64); 14] = [
+    ("Blue Ridge Fabrication", OppStage::Negotiation, "capital", 8_500_000),
+    ("Coastal Chem Processing", OppStage::Lead, "filter-program", 1_200_000),
+    ("Meridian Biologics", OppStage::Qualified, "capital", 14_500_000),
+    ("Liberty Auto Components", OppStage::Negotiation, "retrofit", 6_400_000),
+    ("Great Lakes Laser Works", OppStage::Quoted, "capital", 9_800_000),
+    ("Motor City Stampings", OppStage::Lead, "filter-program", 980_000),
+    ("Heartland Mills", OppStage::Qualified, "filter-program", 2_100_000),
+    ("Lone Star Thermal Spray", OppStage::Quoted, "capital", 7_800_000),
+    ("Alpenglow Pharmaceuticals", OppStage::Qualified, "filter-program", 4_000_000),
+    ("Rocky Mountain Mining Supply", OppStage::Negotiation, "capital", 7_800_000),
+    ("Ironhold Alloys", OppStage::Quoted, "capital", 21_500_000),
+    ("Pacific Crest Pharma", OppStage::Lead, "filter-program", 1_500_000),
+    ("Maple Leaf Metal Fab", OppStage::Qualified, "retrofit", 5_400_000),
+    ("Cascadia Mining Co.", OppStage::Negotiation, "capital", 7_800_000),
+];
+
+fn book_account<'a>(accounts: &'a [AccountRow], name: &str) -> &'a AccountRow {
+    accounts
+        .iter()
+        .find(|a| a.name == name)
+        .unwrap_or_else(|| panic!("opportunity-book account missing: {name}"))
+}
+
+/// The Ridgeline win-back beat + the 14-opp pipeline book. `rng` MUST be the
+/// isolated opp-book stream (see OPP_BOOK_STREAM_KEY).
+pub fn build_opportunity_book(rng: &mut StdRng, accounts: &[AccountRow]) -> Vec<OppRow> {
+    let mut opps = Vec::with_capacity(OPP_BOOK.len() + 1);
+
+    // Beat 6: Ridgeline win-back — qualified, no quote (D. drafts P3-1 live),
+    // near-term close.
+    let ridgeline = book_account(accounts, RIDGELINE_ACCOUNT);
+    opps.push(OppRow {
+        id: det_uuid(rng),
+        account_id: ridgeline.id,
+        territory_id: ridgeline.territory_id,
+        owner_id: ridgeline.rep_id,
+        stage: OppStage::Qualified,
+        kind: RIDGELINE_WINBACK_KIND,
+        amount_cents: RIDGELINE_WINBACK_AMOUNT_CENTS,
+        expected_close: Some(add_days(
+            NaiveDate::from_ymd_opt(2026, 9, 1).expect("valid date"),
+            pick_i64(rng, 0, 30),
+        )),
+        lost_reason: None,
+    });
+
+    for (name, stage, kind, amount_cents) in OPP_BOOK {
+        let account = book_account(accounts, name);
+        opps.push(OppRow {
+            id: det_uuid(rng),
+            account_id: account.id,
+            territory_id: account.territory_id,
+            owner_id: account.rep_id,
+            stage,
+            kind,
+            amount_cents,
+            expected_close: Some(add_days(
+                NaiveDate::from_ymd_opt(2026, 8, 1).expect("valid date"),
+                pick_i64(rng, 0, 150),
+            )),
+            lost_reason: None,
+        });
+    }
+
+    opps
 }
 
 // ── Beat 5: the deliberate mess ─────────────────────────────────────────────

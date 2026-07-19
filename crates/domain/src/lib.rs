@@ -3,10 +3,12 @@
 //! points (i64) and converted to a 2-decimal NUMERIC only at the database edge.
 //! No f64 anywhere near money.
 
+pub mod discount;
 pub mod enums;
 pub mod money;
 pub mod period;
 
+pub use discount::*;
 pub use enums::*;
 pub use money::*;
 pub use period::*;
