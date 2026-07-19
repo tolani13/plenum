@@ -77,7 +77,10 @@ fn generate_world() -> World {
     // master `rng` sequence (and every frozen order/unit anchor) is untouched.
     let mut opp_rng = StdRng::seed_from_u64(util::SEED ^ story_beats::OPP_BOOK_STREAM_KEY);
     let mut opportunities = vec![opp];
-    opportunities.extend(story_beats::build_opportunity_book(&mut opp_rng, &account_rows));
+    opportunities.extend(story_beats::build_opportunity_book(
+        &mut opp_rng,
+        &account_rows,
+    ));
 
     World {
         territories,

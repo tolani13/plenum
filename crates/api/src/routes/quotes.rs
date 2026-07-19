@@ -252,7 +252,9 @@ pub async fn list_quotes(
     let (limit, offset) = parse_page(params.limit, params.offset)?;
     let view = params.view.as_deref().unwrap_or("mine");
     if view != "mine" && view != "approvals" {
-        return Err(ApiError::Invalid("view must be 'mine' or 'approvals'".into()));
+        return Err(ApiError::Invalid(
+            "view must be 'mine' or 'approvals'".into(),
+        ));
     }
     let role = user.role.as_str();
 
@@ -391,7 +393,9 @@ pub async fn create_quote(
             .ok_or_else(|| ApiError::Invalid("discount_pct must be a number".into()))?
             .round_dp_with_strategy(2, MidpointAwayFromZero);
         if disc < Decimal::ZERO || disc > Decimal::from(100) {
-            return Err(ApiError::Invalid("discount_pct must be between 0 and 100".into()));
+            return Err(ApiError::Invalid(
+                "discount_pct must be between 0 and 100".into(),
+            ));
         }
         prepared.push((line.product_id, line.qty, disc));
     }
@@ -475,7 +479,9 @@ pub async fn get_quote(
     Path(id): Path<Uuid>,
 ) -> Result<Json<QuoteDetail>, ApiError> {
     let mut tx = rls_tx(&state.pool, &user).await?;
-    let detail = load_quote_detail(&mut tx, id).await?.ok_or(ApiError::NotFound)?;
+    let detail = load_quote_detail(&mut tx, id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
     tx.commit().await?;
     Ok(Json(detail))
 }
@@ -539,7 +545,9 @@ pub async fn submit_quote(
         }
     }
 
-    let detail = load_quote_detail(&mut tx, id).await?.ok_or(ApiError::Internal)?;
+    let detail = load_quote_detail(&mut tx, id)
+        .await?
+        .ok_or(ApiError::Internal)?;
     tx.commit().await?;
     Ok(Json(detail))
 }
@@ -596,7 +604,9 @@ pub async fn approve_quote(
     .execute(&mut *tx)
     .await?;
 
-    let detail = load_quote_detail(&mut tx, id).await?.ok_or(ApiError::Internal)?;
+    let detail = load_quote_detail(&mut tx, id)
+        .await?
+        .ok_or(ApiError::Internal)?;
     tx.commit().await?;
     Ok(Json(detail))
 }
@@ -634,7 +644,9 @@ pub async fn reject_quote(
     .execute(&mut *tx)
     .await?;
 
-    let detail = load_quote_detail(&mut tx, id).await?.ok_or(ApiError::Internal)?;
+    let detail = load_quote_detail(&mut tx, id)
+        .await?
+        .ok_or(ApiError::Internal)?;
     tx.commit().await?;
     Ok(Json(detail))
 }

@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT order_id AS \"id!\", ordered_on AS \"ordered_on!\",\n                  SUM(gross_cents)::bigint AS \"gross_cents!\",\n                  SUM(net_cents)::bigint   AS \"net_cents!\"\n           FROM v_order_facts WHERE account_id = $1\n           GROUP BY order_id, ordered_on\n           ORDER BY ordered_on DESC, order_id DESC\n           LIMIT $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "ordered_on!",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "net_cents!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "3447b8f258b8179f832d74ab22f92ab9ce86a4ff8fb41dc0c2d6125bfed653a6"
+}

@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT unit_id AS \"id!\", serial AS \"serial!\",\n                  unit_family AS \"family!\", source AS \"source!\",\n                  site_label AS \"site_label!\",\n                  commissioned_on AS \"commissioned_on!\",\n                  expected_changeout_months, last_filter_order_on,\n                  cartridge_sku, cartridge_name,\n                  cartridge_count AS \"cartridge_count!\"\n           FROM v_unit_facts WHERE account_id = $1\n           ORDER BY commissioned_on, serial",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "serial!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "family!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "source!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "site_label!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "commissioned_on!",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 6,
+        "name": "expected_changeout_months",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "last_filter_order_on",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 8,
+        "name": "cartridge_sku",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "cartridge_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "cartridge_count!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "944b29bd2f3a15c2a5cf41bfdf3be56f69478f5967bb165e642749046b5f7888"
+}

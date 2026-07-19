@@ -1,0 +1,102 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.id, o.account_id, a.name AS account_name, t.code AS \"territory_code!\",\n                  o.owner_id, u.name AS owner_name,\n                  o.stage AS \"stage: OppStage\", o.kind, o.amount_cents,\n                  o.expected_close, o.lost_reason,\n                  aq.net_cents AS approved_quote_net_cents\n           FROM opportunities o\n           JOIN accounts a ON a.id = o.account_id\n           JOIN territories t ON t.id = o.territory_id\n           JOIN users u ON u.id = o.owner_id\n           LEFT JOIN LATERAL (\n             SELECT (SELECT COALESCE(SUM(ql.net_unit_cents * ql.qty), 0)::bigint\n                     FROM quote_lines ql WHERE ql.quote_id = q.id) AS net_cents\n             FROM quotes q\n             WHERE q.opportunity_id = o.id AND q.status = 'approved'\n             ORDER BY q.decided_at DESC NULLS LAST, q.created_at DESC, q.id DESC\n             LIMIT 1\n           ) aq ON true\n           WHERE o.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "account_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "owner_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "stage: OppStage",
+        "type_info": {
+          "Custom": {
+            "name": "opp_stage",
+            "kind": {
+              "Enum": [
+                "lead",
+                "qualified",
+                "quoted",
+                "negotiation",
+                "won",
+                "lost"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "amount_cents",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "expected_close",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 10,
+        "name": "lost_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "approved_quote_net_cents",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "6128aebaf4b38cf57da9a59a52a6d68b0ea1c50f96214efd56749292766778c4"
+}

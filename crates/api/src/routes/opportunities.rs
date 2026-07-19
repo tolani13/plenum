@@ -261,10 +261,12 @@ pub async fn create_opportunity(
             if !matches!(user.role, UserRole::Vp | UserRole::Admin) {
                 return Err(ApiError::Forbidden);
             }
-            let exists: bool =
-                sqlx::query_scalar!(r#"SELECT EXISTS(SELECT 1 FROM users WHERE id = $1) AS "e!""#, oid)
-                    .fetch_one(&mut *tx)
-                    .await?;
+            let exists: bool = sqlx::query_scalar!(
+                r#"SELECT EXISTS(SELECT 1 FROM users WHERE id = $1) AS "e!""#,
+                oid
+            )
+            .fetch_one(&mut *tx)
+            .await?;
             if !exists {
                 return Err(ApiError::Invalid("unknown owner_id".into()));
             }
@@ -390,9 +392,12 @@ pub async fn patch_stage(
             let (order, quote_id) = book_won(&mut tx, id, &ctx).await?;
             booked_order = Some(order);
             accepted_quote_id = Some(quote_id);
-            sqlx::query!(r#"UPDATE opportunities SET stage = 'won' WHERE id = $1"#, id)
-                .execute(&mut *tx)
-                .await?;
+            sqlx::query!(
+                r#"UPDATE opportunities SET stage = 'won' WHERE id = $1"#,
+                id
+            )
+            .execute(&mut *tx)
+            .await?;
         }
     }
 

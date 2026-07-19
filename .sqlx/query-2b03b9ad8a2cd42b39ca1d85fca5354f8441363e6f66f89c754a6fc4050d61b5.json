@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ql.id, ql.product_id, p.sku AS product_sku, p.name AS product_name,\n                  p.family, ql.qty, ql.list_unit_cents, ql.net_unit_cents,\n                  ql.discount_pct::float8 AS \"discount_pct!\"\n           FROM quote_lines ql\n           JOIN quotes q ON q.id = ql.quote_id\n           JOIN products p ON p.id = ql.product_id\n           WHERE ql.quote_id = $1\n           ORDER BY ql.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "product_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "product_sku",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "product_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "family",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "qty",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "list_unit_cents",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "net_unit_cents",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "discount_pct!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "2b03b9ad8a2cd42b39ca1d85fca5354f8441363e6f66f89c754a6fc4050d61b5"
+}

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\"\n           FROM quotes q\n           CROSS JOIN discount_policy dp\n           LEFT JOIN LATERAL (\n             SELECT max(ql.discount_pct) AS worst\n             FROM quote_lines ql JOIN quotes qv ON qv.id = ql.quote_id\n             WHERE ql.quote_id = q.id\n           ) agg ON true\n           WHERE CASE\n             WHEN $1 = 'mine' THEN q.created_by = $2\n             WHEN $1 = 'approvals' THEN q.status = 'pending_approval' AND CASE\n               WHEN $3 IN ('vp','admin') THEN true\n               WHEN $3 = 'regional_manager' THEN COALESCE(agg.worst, 0) <= dp.manager_max_pct\n               ELSE false\n             END\n             ELSE false\n           END",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a13cb4a3701fa356992bec81a6d922443718c369197d6eca819dbe09d0914af8"
+}

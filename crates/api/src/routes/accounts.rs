@@ -343,10 +343,12 @@ pub async fn get_account(
     .fetch_all(&mut *tx)
     .await?;
 
-    let activity_total: i64 =
-        sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM activities WHERE account_id = $1"#, id)
-            .fetch_one(&mut *tx)
-            .await?;
+    let activity_total: i64 = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM activities WHERE account_id = $1"#,
+        id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
 
     tx.commit().await?;
 
@@ -426,10 +428,12 @@ pub async fn create_account(
 
     // The territory must exist (422) and be in the caller's scope (403) — this
     // turns the WITH CHECK guard into a clean typed error instead of a 500.
-    let exists: bool =
-        sqlx::query_scalar!(r#"SELECT EXISTS(SELECT 1 FROM territories WHERE id = $1) AS "e!""#, body.territory_id)
-            .fetch_one(&mut *tx)
-            .await?;
+    let exists: bool = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM territories WHERE id = $1) AS "e!""#,
+        body.territory_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
     if !exists {
         return Err(ApiError::Invalid("unknown territory".into()));
     }

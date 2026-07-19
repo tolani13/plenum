@@ -94,7 +94,10 @@ mod tests {
     fn tiers_partition_the_range_with_inclusive_low_boundaries() {
         let p = policy();
         // ≤ 10.00 → self-approve, boundary inclusive.
-        assert_eq!(ApprovalTier::from_worst(pct(0), &p), ApprovalTier::SelfApprove);
+        assert_eq!(
+            ApprovalTier::from_worst(pct(0), &p),
+            ApprovalTier::SelfApprove
+        );
         assert_eq!(
             ApprovalTier::from_worst(pct(1000), &p),
             ApprovalTier::SelfApprove

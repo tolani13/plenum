@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO opportunities\n             (account_id, territory_id, owner_id, stage, kind, amount_cents, expected_close)\n           VALUES ($1, $2, $3, 'lead', $4, $5, $6)\n           RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Int8",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ebc1cc08df0ed90ee8b0f20a602d4029d6b376d3b4bf293ae24029d0bbc87f5e"
+}

@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(SUM(gross_cents), 0)::bigint AS \"gross!\",\n                  COALESCE(SUM(net_cents), 0)::bigint   AS \"net!\",\n                  COALESCE(SUM(discount_cents), 0)::bigint AS \"leakage!\"\n           FROM v_order_facts WHERE account_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "gross!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "net!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "leakage!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "d66c017b69fbaf5dc1dd5804245ea47981d8a65353c8daa43ce2abd1b543fa40"
+}

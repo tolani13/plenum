@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO quote_lines\n                 (quote_id, product_id, qty, list_unit_cents, net_unit_cents, discount_pct)\n               SELECT $1, p.id, $2, p.list_price_cents,\n                      round(p.list_price_cents * (100 - $3::numeric) / 100)::bigint,\n                      $3::numeric\n               FROM products p WHERE p.id = $4\n               RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Numeric",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "61d5b3089f51111954ec20973bc5c427fa5a73ec7c4bc3f75331e1da28aa8788"
+}

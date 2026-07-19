@@ -248,20 +248,85 @@ pub const RIDGELINE_WINBACK_AMOUNT_CENTS: i64 = 3_400_000;
 /// here has ≥1 site (precondition 5) and its territory/owner are taken from the
 /// account row (R2: territory_id ALWAYS == the account's territory).
 const OPP_BOOK: [(&str, OppStage, &str, i64); 14] = [
-    ("Blue Ridge Fabrication", OppStage::Negotiation, "capital", 8_500_000),
-    ("Coastal Chem Processing", OppStage::Lead, "filter-program", 1_200_000),
-    ("Meridian Biologics", OppStage::Qualified, "capital", 14_500_000),
-    ("Liberty Auto Components", OppStage::Negotiation, "retrofit", 6_400_000),
-    ("Great Lakes Laser Works", OppStage::Quoted, "capital", 9_800_000),
-    ("Motor City Stampings", OppStage::Lead, "filter-program", 980_000),
-    ("Heartland Mills", OppStage::Qualified, "filter-program", 2_100_000),
-    ("Lone Star Thermal Spray", OppStage::Quoted, "capital", 7_800_000),
-    ("Alpenglow Pharmaceuticals", OppStage::Qualified, "filter-program", 4_000_000),
-    ("Rocky Mountain Mining Supply", OppStage::Negotiation, "capital", 7_800_000),
+    (
+        "Blue Ridge Fabrication",
+        OppStage::Negotiation,
+        "capital",
+        8_500_000,
+    ),
+    (
+        "Coastal Chem Processing",
+        OppStage::Lead,
+        "filter-program",
+        1_200_000,
+    ),
+    (
+        "Meridian Biologics",
+        OppStage::Qualified,
+        "capital",
+        14_500_000,
+    ),
+    (
+        "Liberty Auto Components",
+        OppStage::Negotiation,
+        "retrofit",
+        6_400_000,
+    ),
+    (
+        "Great Lakes Laser Works",
+        OppStage::Quoted,
+        "capital",
+        9_800_000,
+    ),
+    (
+        "Motor City Stampings",
+        OppStage::Lead,
+        "filter-program",
+        980_000,
+    ),
+    (
+        "Heartland Mills",
+        OppStage::Qualified,
+        "filter-program",
+        2_100_000,
+    ),
+    (
+        "Lone Star Thermal Spray",
+        OppStage::Quoted,
+        "capital",
+        7_800_000,
+    ),
+    (
+        "Alpenglow Pharmaceuticals",
+        OppStage::Qualified,
+        "filter-program",
+        4_000_000,
+    ),
+    (
+        "Rocky Mountain Mining Supply",
+        OppStage::Negotiation,
+        "capital",
+        7_800_000,
+    ),
     ("Ironhold Alloys", OppStage::Quoted, "capital", 21_500_000),
-    ("Pacific Crest Pharma", OppStage::Lead, "filter-program", 1_500_000),
-    ("Maple Leaf Metal Fab", OppStage::Qualified, "retrofit", 5_400_000),
-    ("Cascadia Mining Co.", OppStage::Negotiation, "capital", 7_800_000),
+    (
+        "Pacific Crest Pharma",
+        OppStage::Lead,
+        "filter-program",
+        1_500_000,
+    ),
+    (
+        "Maple Leaf Metal Fab",
+        OppStage::Qualified,
+        "retrofit",
+        5_400_000,
+    ),
+    (
+        "Cascadia Mining Co.",
+        OppStage::Negotiation,
+        "capital",
+        7_800_000,
+    ),
 ];
 
 fn book_account<'a>(accounts: &'a [AccountRow], name: &str) -> &'a AccountRow {

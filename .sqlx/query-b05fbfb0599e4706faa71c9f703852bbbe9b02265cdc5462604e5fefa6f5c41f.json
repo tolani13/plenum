@@ -1,0 +1,138 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT q.id, q.opportunity_id, o.account_id, a.name AS account_name,\n                  t.code AS \"territory_code!\", q.status AS \"status: QuoteStatus\",\n                  q.created_by, cu.name AS created_by_name,\n                  q.approver_id, au.name AS \"approver_name?\",\n                  q.created_at, q.submitted_at, q.decided_at, q.decision_reason,\n                  q.discount_policy_result,\n                  agg.worst::float8 AS worst_discount_pct,\n                  agg.gross AS \"gross_cents!\", agg.net AS \"net_cents!\"\n           FROM quotes q\n           JOIN opportunities o ON o.id = q.opportunity_id\n           JOIN accounts a ON a.id = o.account_id\n           JOIN territories t ON t.id = o.territory_id\n           JOIN users cu ON cu.id = q.created_by\n           LEFT JOIN users au ON au.id = q.approver_id\n           LEFT JOIN LATERAL (\n             SELECT max(ql.discount_pct) AS worst,\n                    COALESCE(SUM(ql.list_unit_cents * ql.qty), 0)::bigint AS gross,\n                    COALESCE(SUM(ql.net_unit_cents  * ql.qty), 0)::bigint AS net\n             FROM quote_lines ql\n             JOIN quotes qv ON qv.id = ql.quote_id\n             WHERE ql.quote_id = q.id\n           ) agg ON true\n           WHERE q.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "opportunity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "account_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "status: QuoteStatus",
+        "type_info": {
+          "Custom": {
+            "name": "quote_status",
+            "kind": {
+              "Enum": [
+                "draft",
+                "pending_approval",
+                "approved",
+                "sent",
+                "accepted",
+                "rejected"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "created_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_by_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "approver_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "approver_name?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "submitted_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "decided_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "decision_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "discount_policy_result",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 15,
+        "name": "worst_discount_pct",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 16,
+        "name": "gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 17,
+        "name": "net_cents!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "b05fbfb0599e4706faa71c9f703852bbbe9b02265cdc5462604e5fefa6f5c41f"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE quotes\n           SET status = 'approved', approver_id = $2, decided_at = now(),\n               decision_reason = NULL\n           WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4a88ee1e5e35d77e46236d427e4935d5f559d1dded3285364054a8398e69f8b4"
+}
