@@ -4,7 +4,7 @@
 // (name · role · scope codes); logout purges the cache on the way out.
 
 import { NavLink, Outlet } from "react-router";
-import { BarChart3, LayoutDashboard, LogOut } from "lucide-react";
+import { BarChart3, Columns3, FileText, LayoutDashboard, LogOut } from "lucide-react";
 import { useMe, useLogout } from "../auth/auth";
 
 function scopeLabel(territories: string[]): string {
@@ -61,6 +61,16 @@ export function Shell() {
             to="/leaderboards"
             icon={<BarChart3 size={15} strokeWidth={2} />}
             label="Leaderboards"
+          />
+          <NavItem
+            to="/pipeline"
+            icon={<Columns3 size={15} strokeWidth={2} />}
+            label="Pipeline"
+          />
+          <NavItem
+            to="/quotes"
+            icon={<FileText size={15} strokeWidth={2} />}
+            label="Quotes"
           />
         </nav>
 

@@ -14,6 +14,7 @@ import {
 } from "../lib/params";
 import type { Basis, Group, Kind } from "../lib/params";
 import { useCustomers, useItems, useLeaderboard } from "../lib/queries";
+import { useAccountsList } from "../lib/crm";
 import { ascNumNullsLast, ascStr, chain, descBasis, ranked } from "../lib/rank";
 import type { CustomerRow, ItemRow, LeaderboardRow } from "../lib/types";
 import { csvFilename, downloadCsv } from "../lib/csv";
@@ -132,6 +133,11 @@ function CustomersTab({
   kind: Kind;
 }) {
   const query = useCustomers(period, kind);
+  // Account-id resolver for row-click → Account 360 (R7). Same RLS scope as the
+  // customers metric, so it never widens what the caller can reach.
+  const accounts = useAccountsList();
+  const accountId = (name: string) =>
+    accounts.data?.items.find((a) => a.name === name)?.id;
   useScreenReady(query.isSuccess || query.isError);
   const data: CustomerX[] = ranked(
     query.data?.items ?? [],
@@ -152,7 +158,7 @@ function CustomersTab({
       }
     >
       <DataTable
-        columns={customerColumns(basis)}
+        columns={customerColumns(basis, accountId)}
         data={data}
         footer={customerFooter(data, basis)}
       />

@@ -85,3 +85,227 @@ export interface DefectionRow {
   annual_consumable_value_cents: number;
   score: number;
 }
+
+// ── P3 CRM operational core — mirror the crates/api/src/routes payloads ──────
+
+export type OppStage =
+  | "lead"
+  | "qualified"
+  | "quoted"
+  | "negotiation"
+  | "won"
+  | "lost";
+
+export type QuoteStatus =
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "sent"
+  | "accepted"
+  | "rejected";
+
+export type ActivityKind = "call" | "visit" | "email" | "note";
+
+export interface OppRow {
+  id: string;
+  account_id: string;
+  account_name: string;
+  territory_code: string;
+  owner_id: string;
+  owner_name: string;
+  stage: OppStage;
+  kind: string;
+  amount_cents: number;
+  expected_close: string | null;
+  lost_reason: string | null;
+  has_approved_quote: boolean;
+  approved_quote_net_cents: number | null;
+}
+
+export interface BookedOrder {
+  id: string;
+  ordered_on: string;
+  gross_cents: number;
+  net_cents: number;
+}
+
+export interface StageResult {
+  opportunity: OppRow;
+  booked_order: BookedOrder | null;
+  accepted_quote_id: string | null;
+}
+
+export interface ProductItem {
+  id: string;
+  sku: string;
+  name: string;
+  family: string;
+  kind: string;
+  list_price_cents: number;
+}
+
+export interface DiscountPolicy {
+  self_max_pct: number;
+  manager_max_pct: number;
+}
+
+export interface QuoteLineOut {
+  id: string;
+  product_id: string;
+  product_sku: string;
+  product_name: string;
+  family: string;
+  qty: number;
+  list_unit_cents: number;
+  net_unit_cents: number;
+  discount_pct: number;
+  line_gross_cents: number;
+  line_net_cents: number;
+}
+
+export interface QuoteDetail {
+  id: string;
+  opportunity_id: string;
+  account_id: string;
+  account_name: string;
+  territory_code: string;
+  status: QuoteStatus;
+  created_by: string;
+  created_by_name: string;
+  approver_id: string | null;
+  approver_name: string | null;
+  created_at: string;
+  submitted_at: string | null;
+  decided_at: string | null;
+  decision_reason: string | null;
+  discount_policy_result: {
+    verdict: string;
+    worst_line_discount_pct: string;
+    self_max_pct: string;
+    manager_max_pct: string;
+    outcome_status: string;
+  } | null;
+  worst_discount_pct: number | null;
+  gross_cents: number;
+  net_cents: number;
+  leakage_cents: number;
+  lines: QuoteLineOut[];
+}
+
+export interface QuoteListRow {
+  id: string;
+  opportunity_id: string;
+  account_name: string;
+  status: QuoteStatus;
+  worst_discount_pct: number | null;
+  created_by_name: string;
+  created_at: string;
+  submitted_at: string | null;
+  gross_cents: number;
+  net_cents: number;
+}
+
+export interface AuditRow {
+  id: string;
+  action: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  at: string;
+  before_status: string | null;
+  after_status: string | null;
+}
+
+export interface AccountSite {
+  id: string;
+  address: string;
+  city: string;
+  state: string;
+}
+
+export interface AccountContact {
+  id: string;
+  site_id: string;
+  name: string;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
+}
+
+export interface UnitTimeline {
+  id: string;
+  serial: string;
+  family: string;
+  source: string;
+  site_label: string;
+  commissioned_on: string;
+  expected_changeout_months: number | null;
+  last_filter_order_on: string | null;
+  cartridge_sku: string | null;
+  cartridge_name: string | null;
+  cartridge_count: number;
+}
+
+export interface AccountOrderBrief {
+  id: string;
+  ordered_on: string;
+  gross_cents: number;
+  net_cents: number;
+}
+
+export interface AccountOppBrief {
+  id: string;
+  stage: OppStage;
+  kind: string;
+  amount_cents: number;
+  expected_close: string | null;
+  owner_name: string;
+  has_approved_quote: boolean;
+}
+
+export interface AccountActivity {
+  id: string;
+  kind: ActivityKind;
+  body: string;
+  occurred_at: string;
+  rep_name: string;
+}
+
+export interface AccountDetail {
+  id: string;
+  name: string;
+  industry: string;
+  status: string;
+  territory_code: string;
+  territory_name: string;
+  parent_account_id: string | null;
+  created: string;
+  cumulative: {
+    gross_cents: number;
+    net_cents: number;
+    leakage_cents: number;
+    leakage_pct: number | null;
+  };
+  sites: AccountSite[];
+  contacts: AccountContact[];
+  units: UnitTimeline[];
+  recent_orders: AccountOrderBrief[];
+  opportunities: AccountOppBrief[];
+  activities: {
+    items: AccountActivity[];
+    limit: number;
+    offset: number;
+    total: number;
+  };
+  signals: unknown[];
+}
+
+export interface AccountItem {
+  id: string;
+  name: string;
+  industry: string;
+  status: string;
+  territory_code: string;
+  parent_account_id: string | null;
+  created: string;
+}
