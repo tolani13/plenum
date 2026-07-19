@@ -1,0 +1,12 @@
+# web/ build + tooling artifacts (node_modules is ignored by the repo root too)
+node_modules/
+dist/
+.vite/
+test-results/
+playwright-report/
+playwright/.cache/
+.playwright-auth/
+*.tsbuildinfo
+
+# scratch verification drivers + captured screenshots (not shipped)
+shots/

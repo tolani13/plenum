@@ -3,8 +3,12 @@
 CRM for the installed-base business — Camfil APC audition artifact.
 Source of truth: [docs/plenum-crm-01.md](docs/plenum-crm-01.md) (spec v01).
 
-**Phase state: P0 and P1 merged to main (P0: D. acceptance 7/7 PASS;
-P1: accepted + merged on D.'s "merge", 2026-07-18). P2+ not started.**
+**Phase state: P0 and P1 merged to main. P2 (Command + Leaderboards UI)
+built on `p2-command-ui`, pending D.'s acceptance. P3+ not started.**
+P2 adds the `web/` React app — login, app shell, the Territory Board
+(Command), and the reps/items/customers Leaderboards with period/basis/kind
+controls and CSV export — served by a Vite dev server that proxies to the
+API. See **Run the UI (P2)** below. No backend change (P2 is UI only).
 P0 = repo scaffold, Postgres schema + Row-Level Security + audit triggers,
 deterministic seed engine, session auth, RLS session middleware, `GET
 /api/accounts`. P1 = the derived analytics layer (`v_order_facts` +
@@ -159,6 +163,146 @@ Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/admin/refresh-roll
 # EXPECTED: 200 + per-matview row counts; re-run check 4 -> numbers still IDENTICAL.
 # FAIL LOOKS LIKE: 200 as rep (privilege hole), or check 4 diverging after
 # refresh (rollups drifting from the ledger).
+```
+
+## Run the UI (P2)
+
+The web app (`web/`) is a Vite dev server that proxies `/api` to the API, so
+the browser talks to one origin and the session cookie just works. The API
+stays on `127.0.0.1:5777`; the web page runs on **`127.0.0.1:5177`** (D.'s
+call, 2026-07-19 — port 5173 was held by another program on this machine).
+
+One-time setup (in `web/`):
+
+```
+cd "C:\AI_Projects\Camfil CRM\web"; npm install
+cd "C:\AI_Projects\Camfil CRM\web"; npx playwright install chromium
+```
+
+Then three windows, one line each (PowerShell):
+
+```
+# W1 — database
+cd "C:\AI_Projects\Camfil CRM"; docker compose up -d
+# W2 — API (leave running)
+cd "C:\AI_Projects\Camfil CRM"; cargo run --bin api
+# W3 — web (leave running)
+cd "C:\AI_Projects\Camfil CRM\web"; npm run dev
+```
+
+Browse to http://127.0.0.1:5177 in Chrome or Edge. Log in with any seeded
+user (password `demo-plenum-2026`); the seed console prints the login table.
+
+For the iPad checks, stop W3 and run `npm run dev:lan` (binds the web page to
+all interfaces; the API stays loopback). Get the PC's address with:
+
+```
+(Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*"} | Select-Object -First 1).IPAddress
+```
+
+Open `http://THAT-ADDRESS:5177` on the iPad.
+
+## P2 acceptance checks (browser + PowerShell, paste-and-run)
+
+Setup: W1/W2/W3 above running, then browse to http://127.0.0.1:5177.
+
+```
+□ 1. SCOPE FIRST. Log in as serena.estes@plenum.demo / demo-plenum-2026.
+     → EXPECTED: Command loads; the Territory Board shows EXACTLY ONE tile,
+       SE-1 Southeast 1; the user chip says rep · SE-1.
+     FAIL LOOKS LIKE: eight tiles, or any tile that isn't SE-1 — scope
+     breach; stop everything and report. (An error page = different failure.)
+
+□ 2. NO GHOSTS BETWEEN LOGINS. Log out. Log in as
+     valerie.price@plenum.demo (all 8 tiles appear). Log out. Log in as
+     serena.estes@plenum.demo again and WATCH the first paint.
+     → EXPECTED: SE-1's single tile only, from the first visible frame.
+     FAIL LOOKS LIKE: the 8-tile board (or VP-sized numbers) flashing for
+     even a moment before shrinking to SE-1 — cached cross-user data.
+
+□ 3. GATE P2-1, amended by architect ruling 2026-07-19 (HANDOFF-LOG).
+     As the VP on Command: note the big KPI number, any tile's dollar
+     figure, and the coverage projected-$ sub-line. Click GROSS/NET once.
+     → EXPECTED: in one motion, no reload, no white flash: the first KPI
+       flips label (NET YTD ↔ GROSS YTD) and value; EVERY tile's dollar
+       figure changes; coverage projected-$ changes. Rank badges recompute
+       by chosen basis — and at 2026 the ORDER HOLDS, because this year's
+       seeded book carries near-uniform margins across territories (honest
+       reading, not a broken toggle; rank movement is check 3b).
+     FAIL LOOKS LIKE: any dollar figure that does not change, a full
+     refetch/blank flash, or the label not flipping.
+
+□ 3b. Leaderboards → customers → period 2025 → basis GROSS. Note the top-10
+     account names. Switch to NET.
+     → EXPECTED: the order visibly changes AND Vantage Metalworks Coastal
+       (gross top-10, #9) is GONE from the net top-10, with Blue Ridge
+       Fabrication entering. P1-1's proven re-rank, now on screen.
+     FAIL LOOKS LIKE: identical order both ways, or identical top-10
+     membership.
+
+□ 4. DRILL. As the VP, click the SE-1 tile.
+     → EXPECTED: a drawer opens on the right: SE-1's revenue/leakage/
+       attainment/order-count/active-accounts figures, its coverage row
+       (units due, % covered, projected $), and an at-risk unit list that
+       includes RIDGELINE GRAIN near the top. Esc closes it.
+     FAIL LOOKS LIKE: empty drawer, a spinner that never resolves, or no
+     Ridgeline Grain anywhere in SE-1's at-risk list.
+
+□ 5. THE LEAKAGE-REP STORY (amended by architect ruling 2026-07-19).
+     Leaderboards → reps → period CUMULATIVE → basis GROSS.
+     → EXPECTED: the #1 rep (Wes Turner) also shows the WORST (highest)
+       leakage % on the board — volume king, margin floor; the §13 demo
+       line lives here. Sorting by the leakage % column puts that same rep
+       on top. (The seed delivers the beat as "volume leader = worst
+       margin," not a #1 flip — his gross lead survives his discounting;
+       the flip form lives on customers, check 3b.)
+     FAIL LOOKS LIKE: the #1 rep's leakage % mid-pack or blank, or the
+     column unsortable.
+
+□ 6. CONTROLS. Items tab → period 2025-Q3 → kind CONSUMABLE.
+     → EXPECTED: rows are cartridge/filter products; an ATTACH % column
+       shows values; switching kind to CAPITAL empties/dashes ATTACH % and
+       changes the rows and totals. Every control change updates the table
+       without a full page reload, and the URL updates with it.
+     FAIL LOOKS LIKE: attach % on capital rows, controls that do nothing,
+     or a 422/error toast from a control combination the UI itself offered.
+
+□ 7. CSV. Customers tab → CUMULATIVE → NET → Export CSV. Open the file.
+     → EXPECTED: plenum-customers-cumulative-net.csv downloads and opens in
+       Excel; its data row count equals the table's visible row count; the
+       first data row is the same account as the table's #1 row. Repeat
+       once logged in as serena: the file's rows are SE-1 accounts only,
+       matching her on-screen table exactly.
+     FAIL LOOKS LIKE: garbled columns in Excel, row counts that don't
+     match the screen, or the rep's file containing accounts her screen
+     doesn't show (scope leak in export — stop and report).
+
+□ 8. THE LEDGER ANCHOR. Still customers + CUMULATIVE + NET (as VP): read
+     the footer total of the NET column.
+     → EXPECTED: exactly $24,670,890.87 — the same cumulative net the API,
+       the raw ledger, and P1's acceptance all agreed on.
+     FAIL LOOKS LIKE: any other number — the UI is misadding or
+     mis-rendering money; stop and report.
+
+□ 9. GATE P2-2, automated half. One line (API from W2 still running):
+     cd "C:\AI_Projects\Camfil CRM\web"; npm run tripwire
+     → EXPECTED: a per-screen/per-width list ending
+       TRIPWIRE 25/25 layout PASS · rep-scope PASS.
+     FAIL LOOKS LIKE: any line naming a screen and width that FAILED
+     (page wider than viewport), or the scope assertion failing.
+
+□ 10. GATE P2-2, manual half (iPad portrait + landscape). In W3, stop the
+     dev server (Ctrl+C) and run: cd "C:\AI_Projects\Camfil CRM\web"; npm run dev:lan
+     Get the PC's address (one line):
+     (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*"} | Select-Object -First 1).IPAddress
+     On the iPad's Safari open http://THAT-ADDRESS:5177, log in as the VP,
+     and try to swipe the page sideways on Command and on Leaderboards, in
+     BOTH portrait and landscape.
+     → EXPECTED: the page never moves horizontally; the Board sits 4-wide
+       in landscape and collapses (4→2) in portrait; tables drop their
+       lesser columns instead of spilling; everything stays readable.
+     FAIL LOOKS LIKE: the whole page slides sideways, tiles/tables cut off
+     at the right edge, or a horizontal scrollbar on the page itself.
 ```
 
 ## Development
