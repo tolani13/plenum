@@ -51,7 +51,7 @@ export function Shell() {
           PLENUM
         </div>
 
-        <nav className="flex flex-row gap-1 md:mt-2 md:flex-col">
+        <nav className="flex w-full flex-row flex-wrap gap-1 md:mt-2 md:w-auto md:flex-col md:flex-nowrap">
           <NavItem
             to="/command"
             icon={<LayoutDashboard size={15} strokeWidth={2} />}
