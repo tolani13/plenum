@@ -47,6 +47,7 @@ dependencies = [
  "domain",
  "dotenvy",
  "http-body-util",
+ "rust_decimal",
  "serde",
  "serde_json",
  "sqlx",
