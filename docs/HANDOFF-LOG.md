@@ -4,6 +4,115 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-19 · P3 CRM operational core
+
+- **Unit:** P3 (Account 360 + installed-base timeline, Pipeline kanban with
+  stage write-back + Won-books-order, Quote builder + approval state machine +
+  audit UI, Activities) — branch `p3-crm-core` from main `a6805eb`. Tier 3,
+  one-and-done. Repo LOCAL-ONLY.
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+- **Architect rulings recorded (R1–R10, verbatim intent):**
+  - **R1 — Won books an order.** `PATCH /api/opportunities/:id/stage` to `won`
+    requires ≥1 quote in status `approved`; else 422 (`"won requires an approved
+    quote"`). Booking copies the most-recent approved quote's lines verbatim
+    (list/net/discount triplet — passes the order_lines CHECK by construction)
+    into a new order; `ordered_on = CURRENT_DATE`; account/territory from the
+    opp; `rep_id = opportunities.owner_id`; `site_id` = the account's MIN(id)
+    site. The consumed quote flips to `accepted`. `won`/`lost` terminal (any
+    transition out = 422); `lost` requires `lost_reason`. Because the live
+    quarter reads v_order_facts directly, a booked order moves the numbers
+    immediately and `refresh_rollups()` must NOT change them (refresh
+    invariance is itself a check).
+  - **R2 — Seed gains a deterministic opportunity book (additive only).** ~14
+    opps across territories/stages (lead→negotiation)/kinds PLUS story beat 6:
+    the Ridgeline win-back opp (SE-1, owner serena, filter-program, qualified,
+    ≈3_400_000 cents, no quote — D. drafts it live, gate P3-1). Separate RNG
+    stream (StdRng seeded from SEED xor a NEW documented constant), appended
+    AFTER all existing draws, territory always == the account's; NO change to
+    accounts/orders/units/products/users. Frozen anchors identical.
+  - **R3 — Thresholds become real seed-config.** New table `discount_policy`
+    (self_max_pct 10.00, manager_max_pct 25.00), seeded, read per request.
+    Submit computes the worst-line discount → verdict: ≤ self → auto-approved
+    (status approved, approver=creator, `self_approved`); ≤ manager →
+    pending_approval (regional_manager/vp/admin); > manager → pending_approval
+    (vp/admin only). The approve/reject HANDLER enforces the role tier. Reject
+    requires a reason.
+  - **R4 — Audit trail app-immutable + scoped reads.** Migration 0011 `REVOKE
+    UPDATE, DELETE ON audit_log FROM plenum_app` (INSERT + SELECT stay). Audit
+    UI reads ONLY via `GET /api/quotes/:id/audit` — joined through the RLS'd
+    quote (invisible quote → 404), actor names resolved. No generic /api/audit.
+  - **R5 — Account 360 payload.** header + cumulative gross/net/leakage (from
+    v_order_facts under RLS), sites, contacts, installed units (timeline),
+    recent orders (capped), opportunities, activities (paginated), `signals:
+    []` (P4 empty state). Invisible account → 404. NULL
+    expected_changeout_months rendered as a "cadence unknown" chip — the mess
+    is the feature, not a bug.
+  - **R6 — POST /api/accounts ships route-only** (name/industry/territory_id/
+    status/parent; scope enforced; 422 on garbage). No P3 screen; one curl.
+  - **R7 — Navigation.** Rail gains Pipeline + Quotes. Account 360 lives at
+    `/accounts/:id`, reached by clicking rows/cards (incl. Leaderboards
+    customers rows). No dead links.
+  - **R8 — List/pagination discipline unchanged.** Every new list: envelope
+    `{items,limit,offset,total}`, limit max 200 (422 above), empty = 200,
+    typed 401/403/404/422.
+  - **R9 — Migration 0011 additive only.** quotes ADD
+    discount_policy_result/submitted_at/decided_at/decision_reason; CREATE
+    discount_policy; the audit REVOKE; grants (SELECT to plenum_app). Wes
+    quote's discount_policy_result + submitted_at backfilled in seed.
+  - **R10 — Client gets policy via GET /api/policy/discount** so the builder's
+    live verdict is client-computed from server truth; submit recomputes
+    server-side regardless (client verdict advisory, server verdict law).
+- **Beyond the R-route-list (flagged, not hidden):** two supporting READS the
+  §8 screen-7 builder + detail require — `GET /api/products` (global catalog
+  for the picker; auth-guarded, non-RLS) and `GET /api/quotes/:id` (detail with
+  lines + verdict; RLS via the quotes join). Both safe; reported openly.
+- **Shipped:**
+  - migrations/0011_crm_core.sql (quotes columns, discount_policy 10/25 seeded,
+    audit REVOKE, grants).
+  - crates/domain/src/discount.rs (DiscountPolicy / ApprovalTier /
+    role_can_decide + 3 unit tests) — the R3 governance logic shared by seed
+    and API.
+  - crates/api/src/routes/: common.rs, accounts.rs (get_account 360 +
+    create_account), opportunities.rs (list/create/patch_stage + R1 booking),
+    quotes.rs (list/create/get/submit/approve/reject/audit), policy.rs,
+    products.rs, activities.rs; mod.rs (routes + `patch`); api gains
+    rust_decimal (workspace dep).
+  - crates/seed/: story_beats.rs (opp book on isolated RNG stream + Wes verdict
+    backfill), data.rs / insert.rs / main.rs (quote columns, opp checksum +
+    per-stage output); seed gains serde_json (already a project dep via api).
+  - crates/api/tests/crm_http.rs — 9 adversarial/integration tests.
+  - web/: lib (apiPatch, CRM types, crm.ts hooks + mutations); crm/ (Timeline,
+    Account360, Pipeline, Quotes, QuoteDetail, QuoteBuilder, badges, verdict);
+    Shell nav (+Pipeline +Quotes, mobile-wrap); App routes; leaderboards
+    customer-row → 360 link (metrics.rs untouched); tripwire.spec.ts extended.
+  - .sqlx regenerated (88 files). Docs: this log, master-plan, CLAUDE.md.
+- **Checks status (outputs in the session report):** scripts/check.sh ALL
+  CHECKS PASSED (fmt · clippy -D warnings · sqlx prepare --check · 34 tests:
+  12 domain unit + 13 prior HTTP untouched + 9 crm_http). Preconditions 1–6
+  PASS (frozen anchors byte-identical across two seed runs; Ridgeline SE-1
+  1 site/5 units; Wes 28% pending intact w/ vp_approval backfill; Harbor
+  Steel/Gulf Coast NULL-vs-real cadence contrast in NE-1/SC-1; every opp has a
+  site; opps 16 = lead 3/qualified 5/quoted 4/negotiation 4). Adversarial
+  matrix green (401 every route; rep foreign 404s; rep-approve-own 403; RM
+  >25% 403 / RM 10–25% 200; VP 28% 200 audit actor=VP; submit-non-draft /
+  approve-draft / won-no-quote / lost-no-reason / out-of-won / limit=201 all
+  422; forged prices ignored; Σ order == Σ quote gross+net; audit_log UPDATE/
+  DELETE denied to plenum_app). Tripwire 45/45 layout + command-scope +
+  pipeline-scope PASS. P3-1 + P3-2 round-trips proven over HTTP.
+- **New anchors:** opportunities **16** (lead 3 / qualified 5 / quoted 4 /
+  negotiation 4), opp checksum **3367519569**, quotes **1**; tripwire **45/45**
+  layout + 2 scope. Frozen anchors unchanged: orders 17353/11556020473,
+  order_lines 25497/-166812187229, mv 120/195/1699/614, customers CUM NET
+  footer $24,670,890.87.
+- **New dependencies:** none external — `rust_decimal` added to crates/api and
+  `serde_json` to crates/seed are BOTH already project dependencies (workspace
+  crates), no new crate enters the tree.
+- **Phase gate: pending D.'s acceptance.** (This line is completed by the
+  PHASE 2 merge step on D.'s "merge".)
+- **Commit:** built across `p3-crm-core` (`0a72011` schema+seed → `d3cdffa`
+  API → `81c23fe` tests → web → tripwire; this log line in the follow-up
+  commit).
+
 ## 2026-07-19 · P2 Command + Leaderboards UI
 
 - **Unit:** P2 (web/ scaffold, tokens, auth+shell, Command w/ Territory Board,
