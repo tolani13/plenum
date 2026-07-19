@@ -74,7 +74,8 @@ One entry per build unit. Newest first.
   120/195/1699/614).
 - **Phase gate: pending D.'s P2 acceptance run (11 observables incl. 3b,
   README §P2).**
-- **Commit:** 〈filled after commit〉 on `p2-command-ui`.
+- **Commit:** `d0741e8` on `p2-command-ui` (this log line added in the
+  immediate follow-up commit).
 
 ## 2026-07-18 · P1 Metrics core
 
