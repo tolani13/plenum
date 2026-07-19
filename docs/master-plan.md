@@ -2,7 +2,35 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-18 — P1 Metrics core: built, accepted, merged
+## [LATEST] 2026-07-19 — P2 Command + Leaderboards UI: built, pending acceptance
+- web/ (React 19 + Vite 7 + Tailwind 4 + TanStack Query/Table + react-router
+  7, TS strict): tokens-first §8 design system (graphite control room,
+  nameplates, tabular numerals), login + shell, Command (Territory Board
+  4×2 cartogram, 4 KPIs, gross/net FLIP re-rank, drill drawer), Leaderboards
+  (reps/items/customers, period scrubber 2023–2026/Q/CUM/TTM, basis, kind,
+  group, footer totals, client CSV). Serving = Vite dev proxy →
+  127.0.0.1:5777; API and all Rust/SQL untouched (zero-diff proven).
+- Architect resolutions: defection-risk KPI until P4 signals; basis-
+  invariant figures stay put by metric definition (attainment always net);
+  drawer-drill (no server territory filter); react-router added; relative
+  leakage LED bands. Signal-count surfaces land P4.
+- Gate amendment (architect ruling 2026-07-19): frozen seed yields no
+  territory re-rank at 2026/cumulative and no rep-#1 flip; P2-1's re-rank
+  observable → customers tab (P1-proven — Vantage Metalworks Coastal drops
+  out of net top-10 at 2025, check 3b); board toggle = every-dollar flip
+  (2026 territory margins near-uniform — honest reading, no synthetic
+  motion); leakage beat = worst-leakage-at-#1 (Wes Turner).
+- Port amendment (D.'s call 2026-07-19): web dev server on 127.0.0.1:5177
+  (5173 held by another tenant); API unchanged on 5777.
+- Responsive doctrine + Playwright tripwire (5 widths × 5 screens +
+  rep-scope assertion) land here per spec — P2-2's automated half (25/25 +
+  scope PASS).
+- Verification: Tier 3 — tripwire scope assertion, cross-login cache purge,
+  rep CSV scope, anchors on-screen ($24,670,890.87 cumulative net footer).
+- Gate: D.'s acceptance run (README §P2, 11 observables incl. 3b), then
+  merge on "merge".
+
+## 2026-07-18 — P1 Metrics core: built, accepted, merged
 - Derived layer: v_order_facts + v_unit_facts (security_invoker — definer
   views over RLS tables would bypass RLS; plenum_admin is superuser), four
   mv_* rollups keyed (entity, territory_id, quarter_start), scoped read

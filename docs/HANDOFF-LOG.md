@@ -4,6 +4,78 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-19 · P2 Command + Leaderboards UI
+
+- **Unit:** P2 (web/ scaffold, tokens, auth+shell, Command w/ Territory Board,
+  Leaderboards w/ period/basis/kind/group controls, CSV export, Playwright
+  responsive tripwire) — branch `p2-command-ui` from main 84c030d.
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+- **Architect resolutions recorded:** defection-risk KPI stands in for
+  open-signals until P4 (signals table empty by design); basis toggle flips
+  every dollar figure + board rank, leakage%/coverage%/defection count
+  basis-invariant by metric definition, attainment always net; territory
+  drill = client-composed drawer (no territory param exists server-side);
+  Vite proxy serving model, API untouched on 127.0.0.1:5777; react-router 7
+  added (spec stack named no router); URL-state controls; fetch-all ≤200
+  tables; client CSV; 4×2 cartogram (CW CE MW NE / W MT SC SE) w/ compact
+  scoped variant; relative leakage LED bands (aggregate, +3pts); full §8
+  stack installed incl. recharts (idle until P3).
+- **Gate amendment 2026-07-19 (architect ruling, in-session):** frozen seed
+  yields no territory re-rank at 2026/cumulative and no rep-#1 flip
+  (preconditions proven: territory gross/net order identical at 2026 AND
+  cumulative, differs only 2023/2024; rep #1 = Wes Turner under both bases
+  every period; leakage rep = Wes Turner, #1 gross with board-worst leakage
+  14.31%). P2-1's re-rank observable RELOCATED to the customers tab (P1-1's
+  proven surface — customers 2025 gross→net: Vantage Metalworks Coastal
+  drops out of the net top-10, Blue Ridge Fabrication enters). Command
+  toggle proves the every-dollar flip; leakage beat = worst-leakage-at-#1.
+  No seed/SQL/Rust change; no synthetic motion. Evidence = precondition
+  outputs at top of this unit's session report.
+- **Port amendment (D.'s call 2026-07-19):** the web dev server's usual port
+  5173 was held by another tenant of this machine (never-touch rule), so D.
+  moved PLENUM's Vite dev server to **127.0.0.1:5177**. The API is unchanged
+  on 5777; the web page proxies /api → 5777. Recorded as an amendment the
+  way the 8080→5777 move was.
+- **Dependency disclosure (constraint 2):** `@types/node` (dev-only,
+  DefinitelyTyped, MIT) added beyond the Resolution-11 list — required for
+  `process.env.VITE_API_TARGET` in vite.config.ts. No runtime dependency.
+- **Shipped (all under web/, plus docs):**
+  - Scaffold: package.json, tsconfig(.app/.node), vite.config.ts
+    (host 127.0.0.1 port 5177 strictPort, proxy /api→5777), index.html,
+    .gitignore; scripts dev | dev:lan | build (tsc -b && vite build) |
+    tripwire.
+  - src/styles/tokens.css — §8 palette in Tailwind v4 @theme, nameplate +
+    tabular utilities, seam elevation, motion tokens.
+  - src/lib/ — api.ts (fetch wrapper, typed ApiError), queryClient.ts (401
+    → purge+redirect), format.ts (money/percent), types.ts (payload
+    mirrors), params.ts (URL grammar), rank.ts (client re-rank), queries.ts
+    (metrics hooks, basis-independent keys), csv.ts (BOM+CRLF export),
+    useScreenReady.ts.
+  - src/auth/ — auth.ts (useMe/useLogin/useLogout w/ clear() on login+logout),
+    RequireAuth.tsx (guard), Login.tsx. src/App.tsx (routes + 401 listener),
+    main.tsx. src/shell/Shell.tsx (rail + user chip + logout).
+  - src/command/ — Command.tsx, KpiRow.tsx, TerritoryBoard.tsx, Tile.tsx,
+    Led.tsx, DrillDrawer.tsx. src/components/ — Segmented, BasisToggle,
+    states.
+  - src/leaderboards/ — Leaderboards.tsx, Controls.tsx, DataTable.tsx
+    (TanStack), columns.tsx (reps/items/customers + footers + CSV maps).
+  - tripwire.spec.ts + playwright.config.ts.
+- **Checks status (internal, output pasted in the session report):**
+  zero-Rust-diff (git diff main -- crates/… migrations/… empty) · npm run
+  build clean (tsc strict) · scripts/check.sh ALL CHECKS PASSED · tripwire
+  25/25 layout + rep-scope PASS · anchor customers cumulative net footer
+  $24,670,890.87 == API sum 2467089087 · adversarial: cross-login cache
+  purge (VP 8 tiles → rep 1 SE-1 tile, no ghost), rep CSV scope (5 SE-1
+  rows, 0 foreign), unauth deep-link → login, tripwire rep-scope · gate
+  P2-1 (KPI flip + every-dollar flip, order holds at 2026 per ruling) +
+  3b (customers re-rank on screen) + amended 5 (Wes #1 gross, worst
+  leakage 14.3%) · error-state quiet ErrorPanel + Retry recovers ·
+  regression anchors unchanged (17353/11556020473, 25497/-166812187229,
+  120/195/1699/614).
+- **Phase gate: pending D.'s P2 acceptance run (11 observables incl. 3b,
+  README §P2).**
+- **Commit:** 〈filled after commit〉 on `p2-command-ui`.
+
 ## 2026-07-18 · P1 Metrics core
 
 - **Unit:** P1 Metrics core (v_order_facts + v_unit_facts, four mv_* rollups

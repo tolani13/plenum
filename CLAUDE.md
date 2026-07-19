@@ -2,7 +2,8 @@
 Source of truth: docs/plenum-crm-01.md (spec v01). Do not re-ask what it answers.
 Phase state: P0 merged to main d4f512d 2026-07-17 (D. acceptance 7/7 PASS).
 P1 Metrics core merged to main 2f610ba 2026-07-18 on D.'s "merge".
-P2+ NOT started. Phase gate: D.'s explicit pass on the prior phase's
+P2 Command+Leaderboards UI built on p2-command-ui, pending D.'s acceptance.
+P3+ NOT started. Phase gate: D.'s explicit pass on the prior phase's
 acceptance checks — never start a phase without it.
 Non-negotiables: RLS in Postgres (API connects ONLY as plenum_app; admin conn is
 seed/migrations only) · money = BIGINT cents · typed errors 401/403/404/422, empty
@@ -26,3 +27,14 @@ machine — D.'s call 2026-07-17); container-internal port stays 5432, so every
 PLENUM owns 5777; the Local-Secure-Ops bank demo keeps 8080 — no contention.
 The never-touch rule for other agents' processes and folders stands (the bank
 demo is Codex's active project; Grok Build also works this machine).
+Web (P2): web/ = Vite dev server 127.0.0.1:5177 (strictPort; 5173 was held by
+another tenant — D.'s call 2026-07-19), proxy /api -> 127.0.0.1:5777; npm run
+dev | dev:lan (iPad checks; API stays loopback) | build (tsc -b) | tripwire
+(Playwright 5-width overflow gate + rep-scope). Frontend consumes payloads
+verbatim; client-side scope widening = breach. Coverage takes basis only;
+defection takes limit/offset only (422 otherwise by design). Signals/activities
+tables empty until P4 — Command's 4th KPI is defection-risk until then
+(recorded resolution). Gate amendment 2026-07-19: the frozen seed holds
+territory order at 2026/cumulative (near-uniform margins), so the gross/net
+re-rank observable lives on the customers tab (P1-1's proven surface); the
+Command toggle proves the every-dollar flip. No seed/SQL/Rust change in P2.
