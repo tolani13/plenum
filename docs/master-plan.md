@@ -2,7 +2,7 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-19 — P2 Command + Leaderboards UI: built, pending acceptance
+## [LATEST] 2026-07-19 — P2 Command + Leaderboards UI: built, accepted, merged
 - web/ (React 19 + Vite 7 + Tailwind 4 + TanStack Query/Table + react-router
   7, TS strict): tokens-first §8 design system (graphite control room,
   nameplates, tabular numerals), login + shell, Command (Territory Board
@@ -27,8 +27,11 @@ Product-level plan. All phase units reference this file and the spec
   scope PASS).
 - Verification: Tier 3 — tripwire scope assertion, cross-login cache purge,
   rep CSV scope, anchors on-screen ($24,670,890.87 cumulative net footer).
-- Gate: D.'s acceptance run (README §P2, 11 observables incl. 3b), then
-  merge on "merge".
+- Accepted + merged 2026-07-19: D.'s acceptance run (all checks PASS —
+  1–6 + 3b under D.'s hands; 7–8 Cowork-driven in D.'s browser under D.'s
+  observation, export files opened + verified; 9 D.'s terminal; 10 amended
+  desktop window-resize form, real-tablet deferred to P5) + literal "merge";
+  merge commit de0be08 (--no-ff). Repo remains local-only.
 
 ## 2026-07-18 — P1 Metrics core: built, accepted, merged
 - Derived layer: v_order_facts + v_unit_facts (security_invoker — definer
@@ -74,9 +77,7 @@ Product-level plan. All phase units reference this file and the spec
 ## Phase ladder (gate = D.'s pass on prior phase's §11 checks, always)
 - P0 Foundation — DONE (this entry).
 - P1 Metrics core — DONE (this entry).
-- P2 Command + Leaderboards UI — login, shell, Territory Board, period/
-  basis/kind controls, CSV export, responsive tripwire (Playwright, five
-  widths) lands here.
+- P2 Command + Leaderboards UI — DONE (this entry).
 - P3 CRM operational core — Account 360 + installed-base timeline,
   pipeline kanban, quote builder + approval state machine + audit UI.
 - P4 Signals + AI — deterministic generators + queue with write-back;
@@ -95,3 +96,5 @@ report by walking acceptance checks, never internal tests alone.
   master-plan created at closeout.
 - 2026-07-18 — P1 built on p1-metrics (626d920, port amendment 2b34203);
   merged 2f610ba.
+- 2026-07-19 — P2 built on p2-command-ui (d0741e8; gate + 5177 port
+  amendments); merged de0be08.

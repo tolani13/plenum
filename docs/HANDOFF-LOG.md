@@ -72,10 +72,16 @@ One entry per build unit. Newest first.
   leakage 14.3%) · error-state quiet ErrorPanel + Retry recovers ·
   regression anchors unchanged (17353/11556020473, 25497/-166812187229,
   120/195/1699/614).
-- **Phase gate: pending D.'s P2 acceptance run (11 observables incl. 3b,
-  README §P2).**
+- **Phase gate: P2 ACCEPTED** — D.'s acceptance run, 2026-07-19, all checks
+  PASS: checks 1–6 and 3b under D.'s own hands; checks 7–8 driven by Cowork
+  in D.'s browser under D.'s observation (D. opened and verified both export
+  files); check 9 (tripwire) in D.'s terminal; check 10 passed in the amended
+  desktop form (architect ruling 2026-07-19: window-resize sweep across the
+  widths; the real-tablet portrait/landscape check is deferred to P5).
 - **Commit:** `d0741e8` on `p2-command-ui` (this log line added in the
-  immediate follow-up commit).
+  immediate follow-up commit `a605957`).
+- **Merge record:** `de0be08` — p2-command-ui merged to main (--no-ff),
+  2026-07-19 17:11:50 -0400, on D.'s "merge". Repo remains local-only.
 
 ## 2026-07-18 · P1 Metrics core
 
