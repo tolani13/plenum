@@ -1,0 +1,94 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT q.id, q.opportunity_id, a.name AS account_name,\n                  q.status AS \"status: QuoteStatus\",\n                  agg.worst::float8 AS worst_discount_pct,\n                  cu.name AS created_by_name, q.created_at, q.submitted_at,\n                  agg.gross AS \"gross_cents!\", agg.net AS \"net_cents!\"\n           FROM quotes q\n           JOIN opportunities o ON o.id = q.opportunity_id\n           JOIN accounts a ON a.id = o.account_id\n           JOIN users cu ON cu.id = q.created_by\n           CROSS JOIN discount_policy dp\n           LEFT JOIN LATERAL (\n             SELECT max(ql.discount_pct) AS worst,\n                    COALESCE(SUM(ql.list_unit_cents * ql.qty), 0)::bigint AS gross,\n                    COALESCE(SUM(ql.net_unit_cents  * ql.qty), 0)::bigint AS net\n             FROM quote_lines ql\n             JOIN quotes qv ON qv.id = ql.quote_id\n             WHERE ql.quote_id = q.id\n           ) agg ON true\n           WHERE CASE\n             WHEN $1 = 'mine' THEN q.created_by = $2\n             WHEN $1 = 'approvals' THEN q.status = 'pending_approval' AND CASE\n               WHEN $3 IN ('vp','admin') THEN true\n               WHEN $3 = 'regional_manager' THEN COALESCE(agg.worst, 0) <= dp.manager_max_pct\n               ELSE false\n             END\n             ELSE false\n           END\n           ORDER BY q.created_at DESC, q.id\n           LIMIT $4 OFFSET $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "opportunity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "account_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "status: QuoteStatus",
+        "type_info": {
+          "Custom": {
+            "name": "quote_status",
+            "kind": {
+              "Enum": [
+                "draft",
+                "pending_approval",
+                "approved",
+                "sent",
+                "accepted",
+                "rejected"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "worst_discount_pct",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_by_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "submitted_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "net_cents!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "34028afd57bb86370c83bbc6b5d113471468ef2f50bfd622018acad5fca3ed58"
+}

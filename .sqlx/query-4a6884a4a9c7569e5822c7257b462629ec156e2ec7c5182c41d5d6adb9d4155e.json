@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT al.id, al.action, al.actor, u.name AS \"actor_name?\", al.at,\n                  al.before->>'status' AS before_status,\n                  al.after->>'status'  AS after_status\n           FROM audit_log al\n           LEFT JOIN users u ON u.id = al.actor\n           WHERE al.entity = 'quotes' AND al.entity_id = $1\n           ORDER BY al.at, al.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "action",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "actor",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "actor_name?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "before_status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "after_status",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "4a6884a4a9c7569e5822c7257b462629ec156e2ec7c5182c41d5d6adb9d4155e"
+}

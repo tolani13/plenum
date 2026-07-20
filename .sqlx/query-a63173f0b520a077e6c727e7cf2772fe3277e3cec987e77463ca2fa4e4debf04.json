@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE opportunities\n                   SET stage = 'lost', lost_reason = $2 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a63173f0b520a077e6c727e7cf2772fe3277e3cec987e77463ca2fa4e4debf04"
+}

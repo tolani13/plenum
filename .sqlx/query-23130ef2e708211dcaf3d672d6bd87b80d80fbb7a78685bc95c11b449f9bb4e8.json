@@ -1,0 +1,72 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT a.id, a.account_id, a.kind AS \"kind: ActivityKind\", a.body,\n                  a.occurred_at, a.rep_id, u.name AS rep_name\n           FROM activities a JOIN users u ON u.id = a.rep_id\n           WHERE ($1::uuid IS NULL OR a.account_id = $1)\n           ORDER BY a.occurred_at DESC, a.id DESC\n           LIMIT $2 OFFSET $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind: ActivityKind",
+        "type_info": {
+          "Custom": {
+            "name": "activity_kind",
+            "kind": {
+              "Enum": [
+                "call",
+                "visit",
+                "email",
+                "note"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "body",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "rep_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "rep_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "23130ef2e708211dcaf3d672d6bd87b80d80fbb7a78685bc95c11b449f9bb4e8"
+}

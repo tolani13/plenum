@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(SUM(list_unit_cents * qty), 0)::bigint AS \"gross!\",\n                  COALESCE(SUM(net_unit_cents * qty), 0)::bigint  AS \"net!\"\n           FROM order_lines WHERE order_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "gross!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "net!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "dda9bc80b423dceae3bb81d5fc5c7a1a5fd19e8058402808ae56a51487d6adb5"
+}

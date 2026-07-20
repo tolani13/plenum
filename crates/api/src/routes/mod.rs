@@ -1,14 +1,22 @@
-//! Router assembly: the P0 surface plus P1's metrics + admin refresh.
+//! Router assembly: the P0 surface, P1's metrics + admin refresh, and P3's CRM
+//! operational core (accounts 360, opportunities, quotes, policy, products,
+//! activities).
 
 pub mod accounts;
+pub mod activities;
 pub mod admin;
 pub mod auth;
+pub mod common;
 pub mod metrics;
+pub mod opportunities;
+pub mod policy;
+pub mod products;
+pub mod quotes;
 
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
-use axum::routing::{get, post};
+use axum::routing::{get, patch, post};
 use axum::Router;
 use tower_sessions::cookie::time::Duration;
 use tower_sessions::cookie::SameSite;
@@ -32,7 +40,34 @@ pub fn app(state: AppState, cookie_secure: bool) -> Router {
         .route("/api/auth/login", post(auth::login))
         .route("/api/auth/logout", post(auth::logout))
         .route("/api/auth/me", get(auth::me))
-        .route("/api/accounts", get(accounts::list_accounts))
+        .route(
+            "/api/accounts",
+            get(accounts::list_accounts).post(accounts::create_account),
+        )
+        .route("/api/accounts/{id}", get(accounts::get_account))
+        .route(
+            "/api/opportunities",
+            get(opportunities::list_opportunities).post(opportunities::create_opportunity),
+        )
+        .route(
+            "/api/opportunities/{id}/stage",
+            patch(opportunities::patch_stage),
+        )
+        .route(
+            "/api/quotes",
+            get(quotes::list_quotes).post(quotes::create_quote),
+        )
+        .route("/api/quotes/{id}", get(quotes::get_quote))
+        .route("/api/quotes/{id}/submit", post(quotes::submit_quote))
+        .route("/api/quotes/{id}/approve", post(quotes::approve_quote))
+        .route("/api/quotes/{id}/reject", post(quotes::reject_quote))
+        .route("/api/quotes/{id}/audit", get(quotes::quote_audit))
+        .route("/api/policy/discount", get(policy::discount_policy))
+        .route("/api/products", get(products::list_products))
+        .route(
+            "/api/activities",
+            get(activities::list_activities).post(activities::create_activity),
+        )
         .route("/api/metrics/territories", get(metrics::territories))
         .route("/api/metrics/leaderboard", get(metrics::leaderboard))
         .route("/api/metrics/items", get(metrics::items))

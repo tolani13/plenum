@@ -1,0 +1,72 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.id, o.stage AS \"stage: OppStage\", o.kind,\n                  o.amount_cents, o.expected_close, u.name AS owner_name,\n                  EXISTS(SELECT 1 FROM quotes q\n                         WHERE q.opportunity_id = o.id AND q.status = 'approved')\n                      AS \"has_approved_quote!\"\n           FROM opportunities o\n           JOIN users u ON u.id = o.owner_id\n           WHERE o.account_id = $1\n           ORDER BY o.amount_cents DESC, o.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "stage: OppStage",
+        "type_info": {
+          "Custom": {
+            "name": "opp_stage",
+            "kind": {
+              "Enum": [
+                "lead",
+                "qualified",
+                "quoted",
+                "negotiation",
+                "won",
+                "lost"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "amount_cents",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "expected_close",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 5,
+        "name": "owner_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "has_approved_quote!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "d86f1efaf84bec29c9ac2d211144427b25b1ba42d8dabb5500a8a387ac5ed649"
+}

@@ -3,12 +3,18 @@ Source of truth: docs/plenum-crm-01.md (spec v01). Do not re-ask what it answers
 Phase state: P0 merged to main d4f512d 2026-07-17 (D. acceptance 7/7 PASS).
 P1 Metrics core merged to main 2f610ba 2026-07-18 on D.'s "merge".
 P2 Command+Leaderboards UI merged to main de0be08 2026-07-19 on D.'s "merge".
-P3+ NOT started. Phase gate: D.'s explicit pass on the prior phase's
+P3 CRM core built on p3-crm-core (pending D.'s acceptance).
+P4+ NOT started. Phase gate: D.'s explicit pass on the prior phase's
 acceptance checks — never start a phase without it.
 Non-negotiables: RLS in Postgres (API connects ONLY as plenum_app; admin conn is
 seed/migrations only) · money = BIGINT cents · typed errors 401/403/404/422, empty
 result ≠ error · pagination max 200 · no secrets in repo or client · sqlx
 compile-checked (.sqlx committed) · clippy -D warnings clean.
+P3 write surface: opportunities/quotes/activities/accounts POST + stage/approval
+actions; Won books an order from the most recent approved quote (quote →
+accepted); discount thresholds live in discount_policy (seed-config 10/25);
+audit_log is app-immutable (REVOKE UPDATE/DELETE) and read only via
+/api/quotes/:id/audit.
 Metrics layer: plenum_app has NO grant on raw mv_* rollups; all metric reads
 go through security_invoker facts views or scoped views carrying the
 v_user_scope fail-closed predicate; refresh only via refresh_rollups()
@@ -32,9 +38,9 @@ another tenant — D.'s call 2026-07-19), proxy /api -> 127.0.0.1:5777; npm run
 dev | dev:lan (iPad checks; API stays loopback) | build (tsc -b) | tripwire
 (Playwright 5-width overflow gate + rep-scope). Frontend consumes payloads
 verbatim; client-side scope widening = breach. Coverage takes basis only;
-defection takes limit/offset only (422 otherwise by design). Signals/activities
-tables empty until P4 — Command's 4th KPI is defection-risk until then
-(recorded resolution). Gate amendment 2026-07-19: the frozen seed holds
+defection takes limit/offset only (422 otherwise by design). Signals table empty
+until P4 (Command's 4th KPI stays defection-risk); activities are user-writable
+from P3 (seeded activities remain absent by design). Gate amendment 2026-07-19: the frozen seed holds
 territory order at 2026/cumulative (near-uniform margins), so the gross/net
 re-rank observable lives on the customers tab (P1-1's proven surface); the
 Command toggle proves the every-dollar flip. No seed/SQL/Rust change in P2.

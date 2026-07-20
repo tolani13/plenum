@@ -13,6 +13,11 @@ import { Login } from "./auth/Login";
 import { Shell } from "./shell/Shell";
 import { Command } from "./command/Command";
 import { Leaderboards } from "./leaderboards/Leaderboards";
+import { Pipeline } from "./crm/Pipeline";
+import { Quotes } from "./crm/Quotes";
+import { QuoteDetail } from "./crm/QuoteDetail";
+import { QuoteBuilder } from "./crm/QuoteBuilder";
+import { Account360 } from "./crm/Account360";
 
 export function App() {
   const qc = useQueryClient();
@@ -40,6 +45,11 @@ export function App() {
           <Route index element={<Navigate to="/command" replace />} />
           <Route path="/command" element={<Command />} />
           <Route path="/leaderboards" element={<Leaderboards />} />
+          <Route path="/pipeline" element={<Pipeline />} />
+          <Route path="/quotes" element={<Quotes />} />
+          <Route path="/quotes/new" element={<QuoteBuilder />} />
+          <Route path="/quotes/:id" element={<QuoteDetail />} />
+          <Route path="/accounts/:id" element={<Account360 />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/command" replace />} />

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT self_max_pct, manager_max_pct FROM discount_policy LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "self_max_pct",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 1,
+        "name": "manager_max_pct",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "c612174826b38dd581c83eb2b7d28977dfb6795b8c93612ea8fec93756e0cfe4"
+}

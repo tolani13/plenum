@@ -6,6 +6,7 @@
 // every field, both bases (resolution 8).
 
 import type { ColumnDef } from "@tanstack/react-table";
+import { Link } from "react-router";
 import { money, percent, count } from "../lib/format";
 import type { Basis, Group } from "../lib/params";
 import type { CustomerRow, ItemRow, LeaderboardRow } from "../lib/types";
@@ -123,7 +124,10 @@ export const repCsv: ReadonlyArray<readonly [string, (r: RepX) => string | numbe
 
 /* ------------------------------------------------------------- customers -- */
 
-export function customerColumns(basis: Basis): ColumnDef<CustomerX, unknown>[] {
+export function customerColumns(
+  basis: Basis,
+  accountId?: (name: string) => string | undefined,
+): ColumnDef<CustomerX, unknown>[] {
   return [
     {
       accessorKey: "_rank",
@@ -133,7 +137,22 @@ export function customerColumns(basis: Basis): ColumnDef<CustomerX, unknown>[] {
     {
       accessorKey: "account_name",
       header: "Account",
-      cell: (c) => <span className="text-text">{c.getValue<string>()}</span>,
+      // Row-click navigation to the Account 360 (R7). The customers metric
+      // payload carries no account_id (metrics.rs is out of scope, constraint
+      // 8), so the id is resolved client-side from the RLS-scoped /api/accounts
+      // list — every visible customer is a visible account, and all 48 names
+      // are distinct, so the map is unambiguous.
+      cell: (c) => {
+        const name = c.getValue<string>();
+        const id = accountId?.(name);
+        return id ? (
+          <Link to={`/accounts/${id}`} className="text-text hover:text-data">
+            {name}
+          </Link>
+        ) : (
+          <span className="text-text">{name}</span>
+        );
+      },
     },
     {
       accessorKey: "gross_cents",

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT self_max_pct::float8 AS \"self_max!\",\n                  manager_max_pct::float8 AS \"manager_max!\"\n           FROM discount_policy LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "self_max!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 1,
+        "name": "manager_max!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "dce6e446f68b7f59a271cb3dc055e4b3a5e1732c5d5ec8a59e6beabf8c2e324b"
+}

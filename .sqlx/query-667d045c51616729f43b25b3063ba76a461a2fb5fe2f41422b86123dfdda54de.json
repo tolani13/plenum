@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT status AS \"status: QuoteStatus\" FROM quotes WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status: QuoteStatus",
+        "type_info": {
+          "Custom": {
+            "name": "quote_status",
+            "kind": {
+              "Enum": [
+                "draft",
+                "pending_approval",
+                "approved",
+                "sent",
+                "accepted",
+                "rejected"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "667d045c51616729f43b25b3063ba76a461a2fb5fe2f41422b86123dfdda54de"
+}

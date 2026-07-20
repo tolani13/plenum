@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT q.id FROM quotes q\n           WHERE q.opportunity_id = $1 AND q.status = 'approved'\n           ORDER BY q.decided_at DESC NULLS LAST, q.created_at DESC, q.id DESC\n           LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9871cd3249daf41236f0005b9c132380356fac69ebec151f5748af9b8f58adcf"
+}

@@ -2,7 +2,44 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-19 — P2 Command + Leaderboards UI: built, accepted, merged
+## [LATEST] 2026-07-19 — P3 CRM operational core: built, awaiting acceptance
+- Shipped surface (branch p3-crm-core): the whole operational loop, all
+  territory-scoped by Postgres RLS, all surviving an API restart. API adds
+  GET /accounts/:id (360 payload: header + cumulative gross/net/leakage +
+  sites + contacts + installed-unit timeline + recent orders + opps +
+  activities + signals:[]), POST /accounts; GET/POST /opportunities + PATCH
+  /opportunities/:id/stage; GET/POST /quotes + submit/approve/reject + GET
+  /quotes/:id + GET /quotes/:id/audit; GET /policy/discount; GET /products;
+  GET/POST /activities. Web adds Pipeline (kanban, native DnD + Move-to
+  fallback, Won-books confirm + toast), Quotes (My/Approvals, builder with
+  live verdict, detail with role-gated actions + audit trail), Account 360
+  (installed-base timeline hero), the activity log, rail nav (Pipeline +
+  Quotes) and customer-row → 360 links.
+- Architect rulings: R1 — dragging to Won BOOKS a real order (copies the
+  most-recent approved quote's lines verbatim, rep_id = opp owner, site =
+  MIN(id); quote → accepted; won/lost terminal; won needs an approved quote,
+  lost needs a reason). R2 — a deterministic opportunity book (14 + the
+  Ridgeline win-back beat) on an ISOLATED RNG stream so every frozen anchor
+  is byte-identical. R3 — discount thresholds become seed-config
+  (discount_policy, 10/25); submit computes the worst-line verdict
+  (self-approve ≤10 / manager 10–25 / VP >25) and the approve/reject HANDLER
+  enforces the role tier. R4 — audit_log is app-immutable (REVOKE
+  UPDATE/DELETE from plenum_app) and read ONLY through /api/quotes/:id/audit
+  (scoped by the quote's RLS visibility; no generic audit feed).
+- Migration 0011 is additive only: quotes gains
+  discount_policy_result/submitted_at/decided_at/decision_reason;
+  discount_policy created + seeded; the audit REVOKE; grants.
+- Verification: Tier 3 (money + scope + authz write surface). check.sh ALL
+  CHECKS PASSED; 34 tests (12 domain unit + 13 prior HTTP untouched + 9 new
+  crm_http adversarial); tripwire 45/45 layout + command-scope + pipeline-
+  scope PASS; P3-1 + P3-2 round-trips proven over HTTP (VP audit actor;
+  booking delta == quote net; refresh invariance).
+- New anchors: opportunities 16 (lead 3 / qualified 5 / quoted 4 /
+  negotiation 4), opp checksum 3367519569, quotes still 1. Frozen anchors
+  unchanged (orders 17353/11556020473, order_lines 25497/-166812187229,
+  mv 120/195/1699/614, customers CUM NET footer $24,670,890.87).
+
+## 2026-07-19 — P2 Command + Leaderboards UI: built, accepted, merged
 - web/ (React 19 + Vite 7 + Tailwind 4 + TanStack Query/Table + react-router
   7, TS strict): tokens-first §8 design system (graphite control room,
   nameplates, tabular numerals), login + shell, Command (Territory Board
@@ -77,9 +114,10 @@ Product-level plan. All phase units reference this file and the spec
 ## Phase ladder (gate = D.'s pass on prior phase's §11 checks, always)
 - P0 Foundation — DONE (this entry).
 - P1 Metrics core — DONE (this entry).
-- P2 Command + Leaderboards UI — DONE (this entry).
-- P3 CRM operational core — Account 360 + installed-base timeline,
-  pipeline kanban, quote builder + approval state machine + audit UI.
+- P2 Command + Leaderboards UI — DONE.
+- P3 CRM operational core — BUILT on p3-crm-core (pending D.'s acceptance):
+  Account 360 + installed-base timeline, pipeline kanban with Won-books-order,
+  quote builder + approval state machine + audit UI, activities.
 - P4 Signals + AI — deterministic generators + queue with write-back;
   Ask PLENUM + discount recommender behind flags; telemetry stub stretch.
 - P5 Polish + demo hardening — leakage screen, data-quality panel,
@@ -98,3 +136,5 @@ report by walking acceptance checks, never internal tests alone.
   merged 2f610ba.
 - 2026-07-19 — P2 built on p2-command-ui (d0741e8; gate + 5177 port
   amendments); merged de0be08.
+- 2026-07-19 — P3 built on p3-crm-core (migration 0011, opp book, CRM
+  routes, Pipeline/Quotes/Account 360, crm_http suite); awaiting acceptance.

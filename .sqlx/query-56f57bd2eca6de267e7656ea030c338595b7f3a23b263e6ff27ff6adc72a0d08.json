@@ -1,0 +1,74 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO accounts (name, industry, status, territory_id, parent_account_id)\n           VALUES ($1, $2, $3::text::account_status, $4, $5)\n           RETURNING id, name, industry, status AS \"status: AccountStatus\",\n                     territory_id, parent_account_id, created",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "industry",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "status: AccountStatus",
+        "type_info": {
+          "Custom": {
+            "name": "account_status",
+            "kind": {
+              "Enum": [
+                "customer",
+                "prospect",
+                "at_risk",
+                "dormant"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "territory_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "parent_account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "created",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "56f57bd2eca6de267e7656ea030c338595b7f3a23b263e6ff27ff6adc72a0d08"
+}

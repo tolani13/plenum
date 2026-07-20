@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT stage AS \"stage: OppStage\", account_id, owner_id, territory_id\n           FROM opportunities WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stage: OppStage",
+        "type_info": {
+          "Custom": {
+            "name": "opp_stage",
+            "kind": {
+              "Enum": [
+                "lead",
+                "qualified",
+                "quoted",
+                "negotiation",
+                "won",
+                "lost"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "territory_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8566dd3efcb3f0a80df9bbe84f7a9d9c3fed06b4b4e9bddc9d34fb9c8e47e147"
+}

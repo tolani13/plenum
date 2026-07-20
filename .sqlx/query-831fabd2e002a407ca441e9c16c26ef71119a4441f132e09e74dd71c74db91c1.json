@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE quotes\n                   SET status = 'approved', approver_id = created_by,\n                       submitted_at = now(), decided_at = now(),\n                       discount_policy_result = $2\n                   WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "831fabd2e002a407ca441e9c16c26ef71119a4441f132e09e74dd71c74db91c1"
+}

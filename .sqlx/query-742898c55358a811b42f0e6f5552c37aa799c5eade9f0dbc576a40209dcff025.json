@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO orders (account_id, site_id, territory_id, rep_id, ordered_on)\n           VALUES ($1, $2, $3, $4, CURRENT_DATE)\n           RETURNING id, ordered_on",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "ordered_on",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "742898c55358a811b42f0e6f5552c37aa799c5eade9f0dbc576a40209dcff025"
+}
