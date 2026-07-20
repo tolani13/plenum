@@ -107,11 +107,32 @@ One entry per build unit. Newest first.
 - **New dependencies:** none external — `rust_decimal` added to crates/api and
   `serde_json` to crates/seed are BOTH already project dependencies (workspace
   crates), no new crate enters the tree.
-- **Phase gate: pending D.'s acceptance.** (This line is completed by the
-  PHASE 2 merge step on D.'s "merge".)
+- **Phase gate: P3 ACCEPTED** — D.'s acceptance run, 2026-07-20, all 11
+  checks PASS. Attribution: checks 1–6, 8, 9a driven by Cowork in D.'s
+  browser under D.'s observation (browser-drive precedent amended by D. for
+  P3 to include writes); checks 7, 9b (API restart survival), 10 (tripwire
+  45/45 + 2 scope), 11 (reseed) run in D.'s own terminal; persistence and
+  reseed re-verification Cowork-driven under observation. Observed: P3-1 —
+  28% quote → pending_approval → VP approve, audit trail 3 rows with
+  actors/timestamps on screen. P3-2 — booking $7,948.80 net, serena
+  cumulative $2,783,017.15 → $2,790,965.95 exact, refresh-invariant.
+- **Corrections for the record (D., 2026-07-20, at acceptance):**
+  1. Serena's true cumulative anchor is **$2,937,783.00 gross /
+     $2,783,017.15 net** — the P3 unit prompt's CURRENT STATE line
+     ($12.9M/$10.8M) was Cowork's wrong reconstruction of digit-truncated
+     skill text; CC's repro number was correct all along. (Grep confirms the
+     wrong figure never entered any repo doc.)
+  2. Post-booking `refresh_rollups()` transiently reports mv_product_period
+     **1700**: the booked current-quarter order enters the matview but is
+     read-filtered by the < current-quarter boundary — benign by design, no
+     read surface changes; reseed restores 1699.
 - **Commit:** built across `p3-crm-core` (`0a72011` schema+seed → `d3cdffa`
-  API → `81c23fe` tests → web → tripwire; this log line in the follow-up
-  commit).
+  API → `81c23fe` tests → `08be128` web → `05241e4` tripwire → `7ac1e08`
+  docs; this acceptance/merge record added in the closeout commit on main).
+- **Merge record:** `c8936ec` — p3-crm-core merged to main (--no-ff),
+  git-stamped 2026-07-19 22:06:13 -0400 (machine clock), on D.'s "merge"
+  with the 2026-07-20 acceptance record. Repo remains local-only; branch
+  p3-crm-core kept, per precedent.
 
 ## 2026-07-19 · P2 Command + Leaderboards UI
 

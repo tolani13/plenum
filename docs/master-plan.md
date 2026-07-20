@@ -2,7 +2,7 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-19 — P3 CRM operational core: built, awaiting acceptance
+## [LATEST] 2026-07-20 — P3 CRM operational core: built, accepted, merged
 - Shipped surface (branch p3-crm-core): the whole operational loop, all
   territory-scoped by Postgres RLS, all surviving an API restart. API adds
   GET /accounts/:id (360 payload: header + cumulative gross/net/leakage +
@@ -37,7 +37,17 @@ Product-level plan. All phase units reference this file and the spec
 - New anchors: opportunities 16 (lead 3 / qualified 5 / quoted 4 /
   negotiation 4), opp checksum 3367519569, quotes still 1. Frozen anchors
   unchanged (orders 17353/11556020473, order_lines 25497/-166812187229,
-  mv 120/195/1699/614, customers CUM NET footer $24,670,890.87).
+  mv 120/195/1699/614, customers CUM NET footer $24,670,890.87). Corrected
+  serena cumulative anchor (D., 2026-07-20): $2,937,783.00 gross /
+  $2,783,017.15 net (the unit prompt's $12.9M/$10.8M line was a wrong
+  reconstruction; never entered the repo).
+- Accepted + merged: D.'s acceptance run 2026-07-20, all 11 checks PASS
+  (1–6, 8, 9a Cowork-driven in D.'s browser under D.'s observation —
+  browser-drive precedent amended by D. for P3 to include writes; 7, 9b,
+  10, 11 in D.'s own terminal) + literal "merge"; merge commit c8936ec
+  (--no-ff). Known benign: post-booking refresh transiently reports
+  mv_product_period 1700 (current-quarter row is read-filtered by the
+  boundary; reseed restores 1699). Repo remains local-only.
 
 ## 2026-07-19 — P2 Command + Leaderboards UI: built, accepted, merged
 - web/ (React 19 + Vite 7 + Tailwind 4 + TanStack Query/Table + react-router
@@ -115,9 +125,9 @@ Product-level plan. All phase units reference this file and the spec
 - P0 Foundation — DONE (this entry).
 - P1 Metrics core — DONE (this entry).
 - P2 Command + Leaderboards UI — DONE.
-- P3 CRM operational core — BUILT on p3-crm-core (pending D.'s acceptance):
-  Account 360 + installed-base timeline, pipeline kanban with Won-books-order,
-  quote builder + approval state machine + audit UI, activities.
+- P3 CRM operational core — DONE (this entry): Account 360 + installed-base
+  timeline, pipeline kanban with Won-books-order, quote builder + approval
+  state machine + audit UI, activities.
 - P4 Signals + AI — deterministic generators + queue with write-back;
   Ask PLENUM + discount recommender behind flags; telemetry stub stretch.
 - P5 Polish + demo hardening — leakage screen, data-quality panel,
@@ -137,4 +147,5 @@ report by walking acceptance checks, never internal tests alone.
 - 2026-07-19 — P2 built on p2-command-ui (d0741e8; gate + 5177 port
   amendments); merged de0be08.
 - 2026-07-19 — P3 built on p3-crm-core (migration 0011, opp book, CRM
-  routes, Pipeline/Quotes/Account 360, crm_http suite); awaiting acceptance.
+  routes, Pipeline/Quotes/Account 360, crm_http suite; tip 7ac1e08).
+- 2026-07-20 — P3 accepted (D., 11/11 PASS) and merged c8936ec.
