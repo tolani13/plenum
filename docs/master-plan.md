@@ -2,7 +2,60 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-20 — P3 CRM operational core: built, accepted, merged
+## [LATEST] 2026-07-20 — P4 Signals + AI: built (branch p4-signals-ai)
+- Shipped surface: signals become REAL — four deterministic generators
+  (reorder_due incl. a telemetry branch, defection_risk from metric 7's view
+  verbatim, conquest via the filter_fits cross-reference, discount_anomaly
+  from per-family order-line statistics) derive the queue from table data
+  alone via generate_signals(), an idempotent invoker-rights job (dedupe_key
+  identity; reruns never duplicate, never touch worked cards, zero audit
+  noise unchanged) run by the seed post-refresh and by POST
+  /api/admin/generate-signals. Thresholds live in signal_policy (seeded
+  config, survives reseed); v_defection_risk now reads its multiplier from
+  it (byte-identical output at the 1.50 default). API: GET /api/signals
+  (enriched, envelope, active-default) + assign/action/dismiss write-backs
+  (scope-checked assignee, required reason/outcome, terminal states, RLS
+  404s, audit via the P0 trigger) + summary + assignees (disclosed
+  additions) + the R13 telemetry stub (admin-gated inbound-feed template).
+  AI behind one seam (crates/api/src/ai/): Ask PLENUM — NL → SQL via the
+  vendor, sqlparser AST validation against the six-view whitelist, executed
+  in the caller's READ-ONLY RLS transaction (5s timeout, LIMIT 500 wrap),
+  SQL receipts always returned; discount recommender — cohort comparables
+  (family × industry × size band) under the caller's scope, narrative only
+  with a key, degraded never erroring; flags + key env-only
+  (ANTHROPIC_API_KEY never committed/logged/client-side); /api/ai/status
+  gates the UI. Web: Signals queue (4 lanes, receipts on cards,
+  draft-quote-from-signal composing P3 machinery, log-call, dismiss+reason),
+  Command KPI 4 → OPEN SIGNALS + per-tile counts, Ask screen (table +
+  recharts bar + SQL receipts + always-on saved-question library), builder
+  COMPS panel + signal prefill, Account 360 signals fill, nav + Cmd-K.
+- Rulings digest: R1 generators-read-the-world (fixture-proven on invented
+  names in a rolled-back tx) · R2 idempotent dedupe-keyed job, no
+  auto-expiry (P5) · R3 signal_policy config (window laddered at PRE-5:
+  90d) · R4 exact math, 30.44 days/month · R5 write surface + two disclosed
+  reads · R6 client-composed draft-from-signal · R7 Command rewire
+  (kpi-signals; defection drawer fetch moved into DrillDrawer) · R8 one
+  vendor seam, 503 ai_unavailable, 15s timeouts · R9 AST-or-nothing
+  validation + read-only scoped execution + receipts · R10 recommender
+  degradation contract · R11 identity single-seam held · R12 seed importer
+  markers · R13 telemetry stub BUILT · R14 360 fill. Flagged: check-7's
+  "no comps button" wording vs R8/R10 (flag gates the button, key gates
+  the narrative) — shipped per rulings.
+- Verification: Tier 3. check.sh ALL CHECKS PASSED (56 tests: 12 domain +
+  7 validator + 22 prior HTTP + 15 new adversarial incl. the R1/R2 fixture
+  world, generation idempotency + zero audit delta, no-resurrection,
+  read-only refusal, LIMIT wrap, 5s timeout as typed 422, recommender
+  scope/degradation, telemetry contract); two seed runs byte-identical;
+  tripwire 55/55 layout + 3 scope PASS; browser-driven internal walk of
+  gates P4-1 (Ridgeline card + prefilled draft + actioned write-back) and
+  the P4-2 flag-off half.
+- Anchors: frozen set unchanged; signal counts CLOCK-DRIFTING by design
+  (build-day: 38/12/28/173 = 251; audit_log +251 after first generation).
+- New dependencies (pre-authorized): reqwest 0.12.28 (MIT/Apache-2.0),
+  sqlparser 0.62.0 (Apache-2.0). recharts finally in use.
+- Acceptance: PENDING D.'s 12-check run; merge on D.'s literal "merge".
+
+## 2026-07-20 — P3 CRM operational core: built, accepted, merged
 - Shipped surface (branch p3-crm-core): the whole operational loop, all
   territory-scoped by Postgres RLS, all surviving an API restart. API adds
   GET /accounts/:id (360 payload: header + cumulative gross/net/leakage +
@@ -128,8 +181,9 @@ Product-level plan. All phase units reference this file and the spec
 - P3 CRM operational core — DONE (this entry): Account 360 + installed-base
   timeline, pipeline kanban with Won-books-order, quote builder + approval
   state machine + audit UI, activities.
-- P4 Signals + AI — deterministic generators + queue with write-back;
-  Ask PLENUM + discount recommender behind flags; telemetry stub stretch.
+- P4 Signals + AI — BUILT on p4-signals-ai (this entry): generators + queue
+  with write-backs, Command rewire, Ask PLENUM + recommender behind flags,
+  telemetry stub. Awaiting D.'s acceptance run.
 - P5 Polish + demo hardening — leakage screen, data-quality panel,
   states pass, README demo script.
 
@@ -149,3 +203,6 @@ report by walking acceptance checks, never internal tests alone.
 - 2026-07-19 — P3 built on p3-crm-core (migration 0011, opp book, CRM
   routes, Pipeline/Quotes/Account 360, crm_http suite; tip 7ac1e08).
 - 2026-07-20 — P3 accepted (D., 11/11 PASS) and merged c8936ec.
+- 2026-07-20 — P4 built on p4-signals-ai (migration 0012 + generate_signals,
+  signals surface, ai/ seam + validator, telemetry stub, queue/Ask/Command
+  rewire, tripwire 55+3; awaiting acceptance).
