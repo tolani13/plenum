@@ -18,6 +18,8 @@ import { Quotes } from "./crm/Quotes";
 import { QuoteDetail } from "./crm/QuoteDetail";
 import { QuoteBuilder } from "./crm/QuoteBuilder";
 import { Account360 } from "./crm/Account360";
+import { Signals } from "./signals/Signals";
+import { Ask } from "./ask/Ask";
 
 export function App() {
   const qc = useQueryClient();
@@ -50,6 +52,8 @@ export function App() {
           <Route path="/quotes/new" element={<QuoteBuilder />} />
           <Route path="/quotes/:id" element={<QuoteDetail />} />
           <Route path="/accounts/:id" element={<Account360 />} />
+          <Route path="/signals" element={<Signals />} />
+          <Route path="/ask" element={<Ask />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/command" replace />} />

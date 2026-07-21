@@ -4,12 +4,13 @@
 //   2. LEAKAGE %       — Σleakage/Σgross; ONE formula, basis-invariant.
 //   3. COVERAGE %      — units-due-weighted count ratio, invariant; but its
 //                        projected-$ sub-line is money and FLIPS with basis.
-//   4. DEFECTION RISK  — at-risk unit count (annual value is gross by
-//                        definition, P1 ruling), invariant; sub-line = worst.
+//   4. OPEN SIGNALS    — P4 (R7): the live active-signal count from
+//                        /api/signals/summary; basis-invariant by definition
+//                        (counts, not dollars). Sub-line = the by-type digest.
 
 import { money, percent, count } from "../lib/format";
 import type { Basis } from "../lib/params";
-import type { CoverageRow, DefectionRow, TerritoryRow } from "../lib/types";
+import type { CoverageRow, SignalsSummary, TerritoryRow } from "../lib/types";
 
 function Kpi({
   label,
@@ -34,7 +35,7 @@ function Kpi({
       >
         {value}
       </div>
-      <div className="mt-1 h-4 text-2xs text-text-dim">{sub ?? ""}</div>
+      <div className="mt-1 h-4 truncate text-2xs text-text-dim">{sub ?? ""}</div>
     </div>
   );
 }
@@ -43,14 +44,12 @@ export function KpiRow({
   territories,
   basis,
   coverageRows,
-  defectionRows,
-  defectionTotal,
+  summary,
 }: {
   territories: TerritoryRow[];
   basis: Basis;
   coverageRows: CoverageRow[] | undefined;
-  defectionRows: DefectionRow[] | undefined;
-  defectionTotal: number | undefined;
+  summary: SignalsSummary | undefined;
 }) {
   // KPI 1 + 2 — from the territory rows.
   const grossSum = territories.reduce((s, r) => s + r.gross_cents, 0);
@@ -79,17 +78,13 @@ export function KpiRow({
     coverageSub = `${count(due)} due · ${money(projected)} proj.`;
   }
 
-  // KPI 4 — at-risk unit count + the worst offender.
-  let defectionValue = "—";
-  let defectionSub: string | undefined;
-  if (defectionTotal !== undefined) {
-    defectionValue = count(defectionTotal);
-    const worst = defectionRows && defectionRows[0];
-    if (worst) {
-      defectionSub = `worst: ${worst.account_name} · ${money(
-        worst.annual_consumable_value_cents,
-      )}/yr`;
-    }
+  // KPI 4 — open signals (open ∪ assigned) with the by-type digest.
+  let signalsValue = "—";
+  let signalsSub: string | undefined;
+  if (summary) {
+    signalsValue = count(summary.total);
+    const b = summary.by_type;
+    signalsSub = `${b.reorder_due} reorder · ${b.defection_risk} defection · ${b.conquest} conquest · ${b.discount_anomaly} anomaly`;
   }
 
   return (
@@ -112,10 +107,10 @@ export function KpiRow({
         sub={coverageSub}
       />
       <Kpi
-        testid="kpi-defection"
-        label="Defection Risk"
-        value={defectionValue}
-        sub={defectionSub}
+        testid="kpi-signals"
+        label="Open Signals"
+        value={signalsValue}
+        sub={signalsSub}
         tone="text-warn"
       />
     </div>

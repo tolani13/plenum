@@ -31,10 +31,13 @@ function aggregateLeakagePct(rows: readonly TerritoryRow[]): number {
 export function TerritoryBoard({
   rows,
   basis,
+  signalCounts,
   onSelect,
 }: {
   rows: TerritoryRow[];
   basis: Basis;
+  /** P4 (R7): open-signal count per territory code, from the summary feed. */
+  signalCounts: Map<string, number>;
   onSelect: (code: string) => void;
 }) {
   const agg = aggregateLeakagePct(rows);
@@ -68,6 +71,7 @@ export function TerritoryBoard({
               row={row}
               basis={basis}
               aggLeakagePct={agg}
+              openSignals={signalCounts.get(code) ?? 0}
               onClick={() => onSelect(code)}
             />
           );
@@ -94,6 +98,7 @@ export function TerritoryBoard({
           row={row}
           basis={basis}
           aggLeakagePct={agg}
+          openSignals={signalCounts.get(row.territory_code) ?? 0}
           onClick={() => onSelect(row.territory_code)}
         />
       ))}
