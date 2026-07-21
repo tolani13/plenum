@@ -20,6 +20,11 @@ pub enum ApiError {
     NotFound,
     #[error("{0}")]
     Invalid(String),
+    /// P4: the AI layer is off (flag or missing key) or the vendor call
+    /// failed. 503 with code `ai_unavailable` — the UI renders its designed
+    /// "AI is off" state, never an error screen (R8).
+    #[error("{0}")]
+    AiUnavailable(&'static str),
     #[error("internal error")]
     Internal,
 }
@@ -58,6 +63,7 @@ impl IntoResponse for ApiError {
             ApiError::Forbidden => (StatusCode::FORBIDDEN, "forbidden"),
             ApiError::NotFound => (StatusCode::NOT_FOUND, "not_found"),
             ApiError::Invalid(_) => (StatusCode::UNPROCESSABLE_ENTITY, "invalid"),
+            ApiError::AiUnavailable(_) => (StatusCode::SERVICE_UNAVAILABLE, "ai_unavailable"),
             ApiError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
         };
         let body = json!({ "error": { "code": code, "message": self.to_string() } });

@@ -20,6 +20,10 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 rust_decimal = { workspace = true }
 dotenvy = { workspace = true }
+# P4 AI layer (pre-authorized): the vendor HTTP client (named ONLY inside
+# src/ai/client.rs) and the SQL AST validator for Ask PLENUM.
+reqwest = { workspace = true }
+sqlparser = { workspace = true }
 
 [dev-dependencies]
 # Test-only, axum-ecosystem crates already in the dependency tree transitively:

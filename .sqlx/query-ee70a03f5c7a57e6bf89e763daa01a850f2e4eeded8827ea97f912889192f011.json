@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n               SELECT 1 FROM v_user_scope vs\n               JOIN accounts a ON a.territory_id = vs.territory_id\n               WHERE vs.user_id = $1 AND a.id = $2\n           ) AS \"e!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "e!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ee70a03f5c7a57e6bf89e763daa01a850f2e4eeded8827ea97f912889192f011"
+}

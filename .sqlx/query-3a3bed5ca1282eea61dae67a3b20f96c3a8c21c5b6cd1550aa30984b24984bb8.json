@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT status AS \"status: SignalStatus\", account_id FROM signals WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status: SignalStatus",
+        "type_info": {
+          "Custom": {
+            "name": "signal_status",
+            "kind": {
+              "Enum": [
+                "open",
+                "assigned",
+                "actioned",
+                "dismissed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "3a3bed5ca1282eea61dae67a3b20f96c3a8c21c5b6cd1550aa30984b24984bb8"
+}

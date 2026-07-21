@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE signals\n           SET status = 'dismissed', dismissed_reason = $2, dismissed_at = now()\n           WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7db07afc4236dbcf8c0dcfbc6bb97f8dc0dee66a6ddeb702d5aa6ec18f98e4d9"
+}

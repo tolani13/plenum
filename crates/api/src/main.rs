@@ -2,7 +2,7 @@
 //! with a plain-language message when the database is absent or unseeded,
 //! serves on BIND_ADDR (default 127.0.0.1:5777), shuts down gracefully.
 
-use api::state::AppState;
+use api::state::{AiConfig, AppState};
 use api::{routes, DEFAULT_APP_URL};
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::EnvFilter;
@@ -33,6 +33,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|_| "COOKIE_SECURE must be true or false")?,
     };
     let bind_addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:5777".to_string());
+    // P4: the AI env keys, read once. The key value never leaves AppState;
+    // only its PRESENCE is logged.
+    let ai = AiConfig::from_env()?;
+    tracing::info!(
+        ask_enabled = ai.ask_enabled(),
+        discount_enabled = ai.discount_enabled(),
+        model = %ai.model,
+        key_present = ai.api_key.is_some(),
+        "AI configuration loaded"
+    );
 
     let pool = PgPoolOptions::new()
         .max_connections(8)
@@ -60,7 +70,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let app = routes::app(AppState { pool }, cookie_secure);
+    let app = routes::app(AppState { pool, ai }, cookie_secure);
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .map_err(|e| format!("cannot bind {bind_addr}: {e} — is another process on the port?"))?;

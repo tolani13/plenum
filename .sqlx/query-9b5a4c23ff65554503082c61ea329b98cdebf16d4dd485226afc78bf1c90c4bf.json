@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\",\n                  percentile_cont(0.5) WITHIN GROUP (ORDER BY f.discount_pct::float8)\n                      AS \"median?\",\n                  percentile_cont(0.25) WITHIN GROUP (ORDER BY f.discount_pct::float8)\n                      AS \"p25?\",\n                  percentile_cont(0.75) WITHIN GROUP (ORDER BY f.discount_pct::float8)\n                      AS \"p75?\"\n           FROM v_order_facts f\n           JOIN accounts a2 ON a2.id = f.account_id\n           WHERE f.family = $1\n             AND a2.industry = $2\n             AND floor(log(GREATEST(f.gross_cents, 1)::numeric))::int = $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "median?",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 2,
+        "name": "p25?",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 3,
+        "name": "p75?",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "9b5a4c23ff65554503082c61ea329b98cdebf16d4dd485226afc78bf1c90c4bf"
+}
