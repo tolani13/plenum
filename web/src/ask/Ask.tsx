@@ -17,11 +17,11 @@ import {
 } from "recharts";
 import { ApiError } from "../lib/api";
 import { useAiStatus, useAsk } from "../lib/ai";
+// P5 (R7): ASK_FOCUS_EVENT lives in lib/events now — this screen is a lazy
+// route, and the Shell must not import anything from its chunk.
+import { ASK_FOCUS_EVENT } from "../lib/events";
 import type { AskResult } from "../lib/types";
 import { useScreenReady } from "../lib/useScreenReady";
-
-/** Re-focus event the Shell fires on Cmd-K/Ctrl-K when already on /ask. */
-export const ASK_FOCUS_EVENT = "plenum:ask-focus";
 
 /** The 7 metric screens as curated questions (spec §6.5) — every link lands
  *  on a live surface; nothing here needs the model. */

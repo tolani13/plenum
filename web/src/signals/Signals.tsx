@@ -37,7 +37,12 @@ const FILTERS: { value: QueueFilter; label: string }[] = [
   { value: "active", label: "Active" },
   { value: "actioned", label: "Actioned" },
   { value: "dismissed", label: "Dismissed" },
+  // P5 (R4): the machine-retired shelf — predicate died, card withdrew.
+  { value: "expired", label: "Expired" },
 ];
+
+/** R6: lanes render incrementally — first page of cards, then user-driven. */
+const LANE_PAGE = 25;
 
 const EMPTY_LANE: Record<SignalType, string> = {
   reorder_due: "No reorder signals in scope — no units inside their cadence window.",
@@ -61,11 +66,13 @@ function StatusChip({ signal }: { signal: SignalRow }) {
         ? "border-warn/50 text-warn"
         : signal.status === "actioned"
           ? "border-ok/50 text-ok"
-          : "border-seam text-text-dim";
+          : "border-seam text-text-dim"; // dismissed + expired: quiet
   const label =
     signal.status === "assigned" && signal.assignee_name
       ? `assigned · ${signal.assignee_name}`
-      : signal.status;
+      : signal.status === "expired" && signal.expired_at
+        ? `expired · ${signal.expired_at.slice(0, 10)}`
+        : signal.status;
   return (
     <span
       className={`nameplate inline-block max-w-full truncate rounded-sm border px-1.5 py-0.5 text-2xs ${tone}`}
@@ -204,6 +211,23 @@ function DismissDialog({
 
 export function Signals() {
   const [filter, setFilter] = useState<QueueFilter>("active");
+  // R6: per-lane visible-card budget; a filter change resets every lane to
+  // its first page.
+  const [laneVisible, setLaneVisible] = useState<Record<SignalType, number>>({
+    reorder_due: LANE_PAGE,
+    defection_risk: LANE_PAGE,
+    conquest: LANE_PAGE,
+    discount_anomaly: LANE_PAGE,
+  });
+  const setFilterAndReset = (next: QueueFilter) => {
+    setFilter(next);
+    setLaneVisible({
+      reorder_due: LANE_PAGE,
+      defection_risk: LANE_PAGE,
+      conquest: LANE_PAGE,
+      discount_anomaly: LANE_PAGE,
+    });
+  };
   const signals = useSignals(filter);
   const summary = useSignalsSummary();
   const opps = useOpportunities("all");
@@ -357,7 +381,7 @@ export function Signals() {
         </div>
         <Segmented
           value={filter}
-          onChange={setFilter}
+          onChange={setFilterAndReset}
           ariaLabel="Signal status filter"
           testid="signals-filter"
           options={FILTERS}
@@ -367,6 +391,8 @@ export function Signals() {
       <div className="grid grid-cols-1 gap-3 min-[760px]:grid-cols-2 min-[1280px]:grid-cols-4">
         {LANES.map((lane) => {
           const rows = byLane.get(lane.type) ?? [];
+          const visible = rows.slice(0, laneVisible[lane.type]);
+          const remaining = rows.length - visible.length;
           return (
             <section
               key={lane.type}
@@ -389,7 +415,7 @@ export function Signals() {
                       : `No ${filter} ${lane.label.toLowerCase()} signals.`}
                   </div>
                 ) : (
-                  rows.map((s) => (
+                  visible.map((s) => (
                     <article
                       key={s.id}
                       data-testid="signal-card"
@@ -499,6 +525,23 @@ export function Signals() {
                         )}
                     </article>
                   ))
+                )}
+                {remaining > 0 && (
+                  <button
+                    onClick={() =>
+                      setLaneVisible((v) => ({
+                        ...v,
+                        [lane.type]: v[lane.type] + LANE_PAGE,
+                      }))
+                    }
+                    data-testid="lane-more"
+                    className="rounded border border-seam px-2 py-1.5 text-2xs text-text-dim transition-colors hover:bg-surface hover:text-text"
+                  >
+                    <span className="nameplate">
+                      Show {Math.min(LANE_PAGE, remaining)} more · {remaining}{" "}
+                      below
+                    </span>
+                  </button>
                 )}
               </div>
             </section>

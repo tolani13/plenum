@@ -88,6 +88,10 @@ export function Tile({
       </div>
       <div className="nameplate text-2xs text-text-dim">{basis} revenue</div>
 
+      {/* R8: when the tile is stretched (tall-viewport board), the slack
+          opens here — instruments pin to top and bottom edges. */}
+      <div className="flex-1" />
+
       <AttainmentBar pct={row.quota_attainment_pct} />
 
       <div className="mt-2 flex items-baseline justify-between border-t border-seam/60 pt-2">

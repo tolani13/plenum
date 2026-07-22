@@ -320,7 +320,14 @@ export type SignalType =
   | "conquest"
   | "discount_anomaly";
 
-export type SignalStatus = "open" | "assigned" | "actioned" | "dismissed";
+export type SignalStatus =
+  | "open"
+  | "assigned"
+  | "actioned"
+  | "dismissed"
+  /** P5 (R4): predicate stopped holding — machine-retired, human-untouched;
+   *  the generator reopens it if the predicate returns. */
+  | "expired";
 
 /** The receipts contract: label + detail render on the card; weight is the
  *  raw numeric term behind the label (days/months/dollars/pct). */
@@ -356,6 +363,8 @@ export interface SignalRow {
   assigned_at: string | null;
   actioned_at: string | null;
   dismissed_at: string | null;
+  /** P5 (R4): when the generator auto-expired the card; null otherwise. */
+  expired_at: string | null;
 }
 
 export interface SignalsSummary {
@@ -377,6 +386,132 @@ export interface AssigneeRow {
   id: string;
   name: string;
   role: Role;
+}
+
+// ── P5 — mirror routes/{metrics,states,data_quality}.rs additions ───────────
+
+export interface DistributionBucket {
+  bucket: string;
+  line_count: number;
+}
+
+export interface OutlierRow {
+  order_id: string;
+  order_line_id: string;
+  account_id: string;
+  territory_code: string;
+  ordered_on: string;
+  account_name: string;
+  rep_name: string;
+  product_sku: string;
+  product_name: string;
+  family: string;
+  qty: number;
+  list_unit_cents: number;
+  net_unit_cents: number;
+  discount_pct: number;
+  family_median_pct: number;
+  threshold_pct: number;
+  /** The matching discount_anomaly signal, when one exists (the chip). */
+  signal_id: string | null;
+  signal_status: string | null;
+}
+
+export interface HeatCell {
+  rep_name: string;
+  family: string;
+  gross_cents: number;
+  net_cents: number;
+}
+
+export interface LeakageRankRow {
+  name: string;
+  gross_cents: number;
+  net_cents: number;
+  leakage_cents: number;
+  leakage_pct: number | null;
+}
+
+export interface LeakagePage {
+  items: LeakageRankRow[];
+  limit: number;
+  offset: number;
+  total: number;
+  discount_distribution: DistributionBucket[];
+  outliers: OutlierRow[];
+  heat: HeatCell[];
+}
+
+export interface StateRow {
+  state_code: string;
+  territory_code: string;
+  gross_cents: number;
+  net_cents: number;
+  leakage_cents: number;
+  leakage_pct: number | null;
+  order_count: number;
+}
+
+export interface TerritoryRoster {
+  territory_id: string;
+  territory_code: string;
+  territory_name: string;
+  region: string;
+  tm_names: string[];
+  rm_names: string[];
+  state_codes: string[];
+}
+
+export interface StatesPage {
+  items: StateRow[];
+  limit: number;
+  offset: number;
+  total: number;
+  territories: TerritoryRoster[];
+}
+
+export interface DuplicatePair {
+  name_key: string;
+  a_id: string;
+  a_name: string;
+  a_territory_code: string;
+  b_id: string;
+  b_name: string;
+  b_territory_code: string;
+}
+
+export interface NullCadenceUnit {
+  unit_id: string;
+  serial: string;
+  account_id: string;
+  account_name: string;
+  territory_code: string;
+  cartridge_sku: string | null;
+}
+
+export interface FullDiscountLine {
+  order_line_id: string;
+  order_id: string;
+  ordered_on: string;
+  account_id: string;
+  account_name: string;
+  territory_code: string;
+  product_sku: string;
+  qty: number;
+  list_unit_cents: number;
+}
+
+export interface ZeroSiteAccount {
+  account_id: string;
+  account_name: string;
+  territory_code: string;
+}
+
+export interface DataQualityBody {
+  duplicate_names: DuplicatePair[];
+  null_cadence_units: NullCadenceUnit[];
+  full_discount_lines: FullDiscountLine[];
+  zero_site_accounts: ZeroSiteAccount[];
 }
 
 export interface AiStatus {

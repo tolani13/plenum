@@ -5,20 +5,28 @@
 //
 // P4: Cmd-K / Ctrl-K is the global Ask PLENUM affordance (R9) — it jumps to
 // /ask and focuses the question input (already there → just re-focuses).
+// P5: three new entries (Territory Map after Command — R3; Leakage between
+// Leaderboards and Pipeline — R1; Data Quality last — R2) and the
+// + New account affordance (R9a) for every role.
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   BarChart3,
   Columns3,
   FileText,
   LayoutDashboard,
+  ListChecks,
   LogOut,
+  Map as MapIcon,
   MessageSquareText,
+  Plus,
   Radar,
+  TrendingDown,
 } from "lucide-react";
 import { useMe, useLogout } from "../auth/auth";
-import { ASK_FOCUS_EVENT } from "../ask/Ask";
+import { ASK_FOCUS_EVENT } from "../lib/events";
+import { NewAccountDialog } from "./NewAccountDialog";
 
 function scopeLabel(territories: string[]): string {
   if (territories.length === 8) return "ALL";
@@ -58,6 +66,7 @@ export function Shell() {
   const logout = useLogout();
   const navigate = useNavigate();
   const location = useLocation();
+  const [newAccountOpen, setNewAccountOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -88,9 +97,19 @@ export function Shell() {
             label="Command"
           />
           <NavItem
+            to="/map"
+            icon={<MapIcon size={15} strokeWidth={2} />}
+            label="Territory Map"
+          />
+          <NavItem
             to="/leaderboards"
             icon={<BarChart3 size={15} strokeWidth={2} />}
             label="Leaderboards"
+          />
+          <NavItem
+            to="/leakage"
+            icon={<TrendingDown size={15} strokeWidth={2} />}
+            label="Leakage"
           />
           <NavItem
             to="/pipeline"
@@ -112,9 +131,23 @@ export function Shell() {
             icon={<MessageSquareText size={15} strokeWidth={2} />}
             label="Ask"
           />
+          <NavItem
+            to="/data-quality"
+            icon={<ListChecks size={15} strokeWidth={2} />}
+            label="Data Quality"
+          />
         </nav>
 
         <div className="ml-auto flex items-center gap-3 md:ml-0 md:mt-auto md:flex-col md:items-stretch md:gap-2">
+          <button
+            onClick={() => setNewAccountOpen(true)}
+            className="flex items-center gap-1.5 rounded border border-seam px-2 py-1.5 text-2xs text-data transition-colors hover:bg-surface-2 md:justify-center"
+            data-testid="new-account"
+            title="Create an account in your territory scope"
+          >
+            <Plus size={14} strokeWidth={2} />
+            <span className="nameplate">New account</span>
+          </button>
           {me.data && (
             <div
               className="min-w-0 text-right md:text-left"
@@ -141,6 +174,10 @@ export function Shell() {
       <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
         <Outlet />
       </main>
+
+      {newAccountOpen && (
+        <NewAccountDialog onClose={() => setNewAccountOpen(false)} />
+      )}
     </div>
   );
 }
