@@ -4,11 +4,12 @@ Phase state: P0 merged to main d4f512d 2026-07-17 (D. acceptance 7/7 PASS).
 P1 Metrics core merged to main 2f610ba 2026-07-18 on D.'s "merge".
 P2 Command+Leaderboards UI merged to main de0be08 2026-07-19 on D.'s "merge".
 P3 CRM core merged to main c8936ec 2026-07-20 on D.'s "merge" (11/11 PASS).
-P4 Signals+AI merged to main 56cdd9b 2026-07-21 on D.'s "merge" (per the
-unit's pre-authorized PHASE 2; the 12-check observation walk stays OWED to
-D.'s own hands — run it before the demo rehearsal). P5 NOT started. Phase
-gate: D.'s explicit pass on the prior phase's acceptance checks — never
-start a phase without it.
+P4 Signals+AI merged to main 56cdd9b 2026-07-21 on D.'s "merge"; the
+12-check walk ran the same evening, 12/12 PASS (acceptance record 8bfe7c7).
+P5 (FINAL) built on p5-polish-map 2026-07-22 — pending D.'s 14-check
+acceptance walk and literal "merge" (pre-authorized PHASE 2). Phase gate:
+D.'s explicit pass on the prior phase's acceptance checks — never start a
+phase without it.
 Non-negotiables: RLS in Postgres (API connects ONLY as plenum_app; admin conn is
 seed/migrations only) · money = BIGINT cents · typed errors 401/403/404/422, empty
 result ≠ error · pagination max 200 · no secrets in repo or client · sqlx
@@ -42,8 +43,41 @@ in the caller's READ-ONLY rls tx (rls_readonly_tx) with 5s timeout + LIMIT
 flag gates endpoint, key gates narrative (degrades to comparables).
 Telemetry stub: POST /api/telemetry/filter-life (role=admin, 422/404 typed)
 feeds the reorder telemetry branch on next generation.
-Tripwire is now 55 layout (11 screens × 5 widths) + 3 scope
-(command/pipeline/signals).
+P5 surface: three new screens/routes — /map (Territory Map: committed CC0
+US-states SVG at web/src/map/, rendered from the derived typed module;
+geography config in territory_states, seeded IN migration 0013 along
+Census lines, keyed by territory CODE — an id FK would be cascade-wiped by
+the seed's TRUNCATE territories CASCADE; NOT in the truncate list), /leakage
+(distribution + outlier feed + rep×family heat; heat/territory palettes are
+tokens.css entries ONLY), /data-quality (read-only pure-SQL finders; the
+seeded trio is complete only at VP view). New reads (disclosed, RLS-scoped):
+GET /api/metrics/states (per-state money via sites.state ⋈ territory_states
++ the config-level TM/RM/state_codes roster) and GET /api/data-quality.
+/metrics/leakage: σ now reads signal_policy.discount_sigma (byte-identical
+at 2.00 — proven); `outliers=policy` (disclosed param) serves the
+discount_anomaly generator's exact math so feed rows match signal chips
+1:1; outlier rows carry order_line_id/account_id/territory_code/signal_id;
+payload gains heat cells. Signal auto-expiry law (0013): generate_signals()
+expires OPEN machine-keyed cards whose dedupe_key is not re-emitted
+(status='expired' + expired_at; per-type expired count in the return);
+assigned/actioned/dismissed NEVER machine-touched; an expired key re-emitted
+REOPENS the same card (expired is machine state); write-backs on expired =
+422; same-day double run stays 0/0/0 with zero audit delta. Perf (0013):
+idx_orders_site_ordered ON orders(site_id, ordered_on DESC, id DESC) — the
+measured fix (v_unit_facts' last_paid lateral + JIT threshold); the seed
+runs a post-load ANALYZE (stats stale after truncate-reload). Queue lanes
+render 25 cards + Show-more (client slice); status filter gains Expired
+(active stays open ∪ assigned). Web bundle: Ask/Map/Leakage/DataQuality are
+lazy routes (main chunk < 500 kB; ASK_FOCUS_EVENT lives in lib/events.ts —
+never import from a lazy chunk into the Shell). lib/fetchAll.ts owns
+FETCH_LIMIT/q; routes/common.rs owns parse_page for accounts+metrics too.
+Scripts: scripts/run-all.ps1 (API + web, materializes a dev .env on fresh
+clones — committed dev values only) · scripts/demo-reset.ps1 (reseed
+one-liner; in-memory sessions mean re-login after). PRODUCTION.md exists at
+the repo root (the demo→deployment map; keep truthful).
+Tripwire is now 70 layout (14 screens × 5 widths) + 5 scope
+(command/pipeline/signals/leakage/map — map = no foreign-territory dollars
+in a rep's DOM).
 Metrics layer: plenum_app has NO grant on raw mv_* rollups; all metric reads
 go through security_invoker facts views or scoped views carrying the
 v_user_scope fail-closed predicate; refresh only via refresh_rollups()
