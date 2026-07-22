@@ -4,10 +4,11 @@ Phase state: P0 merged to main d4f512d 2026-07-17 (D. acceptance 7/7 PASS).
 P1 Metrics core merged to main 2f610ba 2026-07-18 on D.'s "merge".
 P2 Command+Leaderboards UI merged to main de0be08 2026-07-19 on D.'s "merge".
 P3 CRM core merged to main c8936ec 2026-07-20 on D.'s "merge" (11/11 PASS).
-P4 Signals+AI BUILT on branch p4-signals-ai 2026-07-20 (awaiting D.'s
-acceptance; merge only on D.'s literal "merge"). P5 NOT started. Phase gate:
-D.'s explicit pass on the prior phase's acceptance checks — never start a
-phase without it.
+P4 Signals+AI merged to main 56cdd9b 2026-07-21 on D.'s "merge" (per the
+unit's pre-authorized PHASE 2; the 12-check observation walk stays OWED to
+D.'s own hands — run it before the demo rehearsal). P5 NOT started. Phase
+gate: D.'s explicit pass on the prior phase's acceptance checks — never
+start a phase without it.
 Non-negotiables: RLS in Postgres (API connects ONLY as plenum_app; admin conn is
 seed/migrations only) · money = BIGINT cents · typed errors 401/403/404/422, empty
 result ≠ error · pagination max 200 · no secrets in repo or client · sqlx

@@ -228,8 +228,24 @@ One entry per build unit. Newest first.
   RESOLVED — used by the Ask chart (main bundle ~774 KB; consider
   code-splitting) · signals/ask lanes could virtualize the VP's ~170-card
   anomaly lane · main-chunk >500 KB Vite warning.
-- **Phase gate:** pending D.'s acceptance run (12 checks in the session
-  report). Merge record: pending.
+- **Phase gate: P4 ACCEPTED** — D.'s literal "merge" reply, 2026-07-21
+  (merge = approval per this unit's pre-authorized PHASE 2 protocol, the P1
+  precedent). Attribution for the record: no per-check acceptance walk was
+  run in-session before the order — the gate rests on the merge order plus
+  the build evidence in this entry (check.sh 56/56, two identical seed runs,
+  tripwire 55 layout + 3 scope, and the browser-driven internal walk of gate
+  P4-1 both halves and gate P4-2's flag-off half). The 12-check walk in the
+  session report remains OWED as D.'s own observation pass (the checks that
+  write data plus the terminal checks: tripwire, reseed, API restart) — run
+  it before the demo rehearsal; any failure reopens the gate.
+- **Commit:** built across `p4-signals-ai` (`d7d629f` schema+seed →
+  `fafc1b5` API → `0fa7ab8` tests → `37f81e1` web → `8448264` tripwire →
+  `59a0598` docs; this acceptance/merge record added in the closeout commit
+  on main).
+- **Merge record:** `56cdd9b` — p4-signals-ai merged to main (--no-ff),
+  2026-07-21 22:21:18 -0400, on D.'s "merge". Staleness check passed (main
+  still `964749f` at merge time). Repo remains local-only; branch
+  p4-signals-ai kept, per precedent.
 
 ## 2026-07-19 · P3 CRM operational core
 

@@ -2,7 +2,7 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-20 — P4 Signals + AI: built (branch p4-signals-ai)
+## [LATEST] 2026-07-20 — P4 Signals + AI: built, merged 2026-07-21
 - Shipped surface: signals become REAL — four deterministic generators
   (reorder_due incl. a telemetry branch, defection_risk from metric 7's view
   verbatim, conquest via the filter_fits cross-reference, discount_anomaly
@@ -53,7 +53,11 @@ Product-level plan. All phase units reference this file and the spec
   (build-day: 38/12/28/173 = 251; audit_log +251 after first generation).
 - New dependencies (pre-authorized): reqwest 0.12.28 (MIT/Apache-2.0),
   sqlparser 0.62.0 (Apache-2.0). recharts finally in use.
-- Acceptance: PENDING D.'s 12-check run; merge on D.'s literal "merge".
+- Accepted + merged: D.'s literal "merge" reply 2026-07-21 (merge = approval
+  per the unit's pre-authorized PHASE 2; no in-session per-check walk — the
+  12-check observation pass stays owed to D.'s own hands, recorded in the
+  HANDOFF-LOG entry); merge commit 56cdd9b (--no-ff). Repo remains
+  local-only; branch p4-signals-ai kept.
 
 ## 2026-07-20 — P3 CRM operational core: built, accepted, merged
 - Shipped surface (branch p3-crm-core): the whole operational loop, all
@@ -181,9 +185,10 @@ Product-level plan. All phase units reference this file and the spec
 - P3 CRM operational core — DONE (this entry): Account 360 + installed-base
   timeline, pipeline kanban with Won-books-order, quote builder + approval
   state machine + audit UI, activities.
-- P4 Signals + AI — BUILT on p4-signals-ai (this entry): generators + queue
-  with write-backs, Command rewire, Ask PLENUM + recommender behind flags,
-  telemetry stub. Awaiting D.'s acceptance run.
+- P4 Signals + AI — DONE (this entry): generators + queue with write-backs,
+  Command rewire, Ask PLENUM + recommender behind flags, telemetry stub.
+  Merged 56cdd9b on D.'s "merge" 2026-07-21; the 12-check observation walk
+  stays owed to D.'s hands.
 - P5 Polish + demo hardening — leakage screen, data-quality panel,
   states pass, README demo script.
 
@@ -205,4 +210,5 @@ report by walking acceptance checks, never internal tests alone.
 - 2026-07-20 — P3 accepted (D., 11/11 PASS) and merged c8936ec.
 - 2026-07-20 — P4 built on p4-signals-ai (migration 0012 + generate_signals,
   signals surface, ai/ seam + validator, telemetry stub, queue/Ask/Command
-  rewire, tripwire 55+3; awaiting acceptance).
+  rewire, tripwire 55+3).
+- 2026-07-21 — P4 merged 56cdd9b on D.'s "merge" (observation walk owed).
