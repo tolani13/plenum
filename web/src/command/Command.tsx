@@ -4,14 +4,17 @@
 // dual-basis and the query key omits basis, so flipping re-renders in place —
 // every dollar figure + KPI flips, no refetch, no flash (gate P2-1).
 //
-// Architect ruling 2026-07-19: at 2026 the frozen book ranks territories the
-// same on both bases, so the tile ORDER holds honestly (the rank-movement
-// observable lives on the Customers leaderboard). Nothing here fakes motion.
+// P4 rewire (R7): the 4th KPI reads OPEN SIGNALS from /api/signals/summary
+// (the defection-risk stand-in retires); each Territory Board tile gains its
+// open-signal count, matched by territory code (the summary carries both id
+// and code; the metrics payload exposes code). Signal counts are
+// basis-invariant by definition — the flip moves money, never the radar.
 
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { COMMAND_PERIOD, parseBasis, periodLabel } from "../lib/params";
-import { useTerritories, useCoverage, useDefection } from "../lib/queries";
+import { useTerritories, useCoverage } from "../lib/queries";
+import { useSignalsSummary } from "../lib/signals";
 import { useScreenReady } from "../lib/useScreenReady";
 import { BasisToggle } from "../components/BasisToggle";
 import { ErrorPanel, LoadingPanel } from "../components/states";
@@ -26,9 +29,9 @@ export function Command() {
 
   const territories = useTerritories(COMMAND_PERIOD);
   const coverage = useCoverage();
-  const defection = useDefection();
+  const summary = useSignalsSummary();
 
-  const settled = [territories, coverage, defection].every(
+  const settled = [territories, coverage, summary].every(
     (query) => query.isSuccess || query.isError,
   );
   useScreenReady(settled);
@@ -40,6 +43,9 @@ export function Command() {
   };
 
   const rows = territories.data?.items ?? [];
+  const signalCounts = new Map<string, number>(
+    (summary.data?.territories ?? []).map((t) => [t.territory_code, t.open_count]),
+  );
 
   return (
     <div className="mx-auto max-w-[1600px]">
@@ -59,8 +65,7 @@ export function Command() {
             territories={rows}
             basis={basis}
             coverageRows={coverage.data?.items}
-            defectionRows={defection.data?.items}
-            defectionTotal={defection.data?.total}
+            summary={summary.data}
           />
         ) : territories.isError ? (
           <ErrorPanel onRetry={() => territories.refetch()} />
@@ -75,7 +80,12 @@ export function Command() {
             No territory activity in scope for this year.
           </div>
         ) : (
-          <TerritoryBoard rows={rows} basis={basis} onSelect={setSelected} />
+          <TerritoryBoard
+            rows={rows}
+            basis={basis}
+            signalCounts={signalCounts}
+            onSelect={setSelected}
+          />
         )
       ) : territories.isError ? (
         <ErrorPanel
@@ -92,8 +102,6 @@ export function Command() {
           basis={basis}
           territories={rows}
           coverageRows={coverage.data?.items}
-          defectionRows={defection.data?.items}
-          defectionTotal={defection.data?.total}
           onClose={() => setSelected(null)}
         />
       )}

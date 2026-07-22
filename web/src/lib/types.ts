@@ -297,7 +297,9 @@ export interface AccountDetail {
     offset: number;
     total: number;
   };
-  signals: unknown[];
+  /** P4 (R14): the account's signals — active first, score DESC, capped 20 —
+   *  in the same enriched shape as GET /api/signals. */
+  signals: SignalRow[];
 }
 
 export interface AccountItem {
@@ -308,4 +310,108 @@ export interface AccountItem {
   territory_code: string;
   parent_account_id: string | null;
   created: string;
+}
+
+// ── P4 Signals + AI — mirror crates/api/src/routes/signals.rs + src/ai ──────
+
+export type SignalType =
+  | "reorder_due"
+  | "defection_risk"
+  | "conquest"
+  | "discount_anomaly";
+
+export type SignalStatus = "open" | "assigned" | "actioned" | "dismissed";
+
+/** The receipts contract: label + detail render on the card; weight is the
+ *  raw numeric term behind the label (days/months/dollars/pct). */
+export interface SignalReason {
+  label: string;
+  weight: number | null;
+  detail: string;
+}
+
+export interface SignalRow {
+  id: string;
+  type: SignalType;
+  status: SignalStatus;
+  score: number;
+  reasons: SignalReason[];
+  account_id: string;
+  account_name: string;
+  territory_code: string;
+  site_id: string | null;
+  site_label: string | null;
+  installed_unit_id: string | null;
+  serial: string | null;
+  cartridge_product_id: string | null;
+  cartridge_sku: string | null;
+  cartridge_count: number | null;
+  annual_value_cents: number | null;
+  order_line_id: string | null;
+  assigned_to: string | null;
+  assignee_name: string | null;
+  outcome: string | null;
+  dismissed_reason: string | null;
+  opened_at: string;
+  assigned_at: string | null;
+  actioned_at: string | null;
+  dismissed_at: string | null;
+}
+
+export interface SignalsSummary {
+  total: number;
+  by_type: {
+    reorder_due: number;
+    defection_risk: number;
+    conquest: number;
+    discount_anomaly: number;
+  };
+  territories: {
+    territory_id: string;
+    territory_code: string;
+    open_count: number;
+  }[];
+}
+
+export interface AssigneeRow {
+  id: string;
+  name: string;
+  role: Role;
+}
+
+export interface AiStatus {
+  ask: boolean;
+  discount: boolean;
+}
+
+export interface AskResult {
+  sql: string;
+  columns: string[];
+  rows: (string | number | boolean | null)[][];
+  row_count: number;
+  truncated: boolean;
+}
+
+export interface CompSample {
+  account_name: string;
+  ordered_on: string;
+  product_sku: string;
+  qty: number;
+  gross_cents: number;
+  discount_pct: number;
+}
+
+export interface DiscountRec {
+  comparables: {
+    count: number;
+    family: string;
+    industry: string;
+    band_label: string;
+    median_pct: number | null;
+    p25: number | null;
+    p75: number | null;
+    sample: CompSample[];
+  };
+  narrative: string | null;
+  degraded: boolean;
 }

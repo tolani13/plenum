@@ -1,18 +1,20 @@
-// Responsive tripwire + rep-scope assertion — gate P2-2's automated half,
-// extended in P3 to the three new screens (Pipeline, Quotes, Account 360) plus
-// the routed quote detail.
+// Responsive tripwire + rep-scope assertions — gate P2-2's automated half,
+// extended in P3 (Pipeline, Quotes, Account 360, quote detail) and in P4
+// (Signals, Ask).
 //
 // Layout: every screen at every supported width must render no wider than its
 // viewport (spec §8: document.documentElement.scrollWidth <= window.innerWidth
 // — a page-level horizontal scrollbar is a build failure).
-//   9 screens × 5 widths = 45 layout observables.
-//   (7 static: login, command, leaderboards ×3, pipeline, quotes;
-//    2 dynamic: /accounts/:id and /quotes/:id, ids resolved via the API in-test.)
+//   11 screens × 5 widths = 55 layout observables.
+//   (9 static: login, command, leaderboards ×3, pipeline, quotes, signals,
+//    ask; 2 dynamic: /accounts/:id and /quotes/:id, ids resolved in-test.)
 //
-// Scope: TWO assertions on the surface —
+// Scope: THREE assertions on the surface —
 //   · a rep (SE-1) sees EXACTLY ONE territory tile on Command, and it is SE-1;
 //   · a rep's Pipeline shows exactly the opportunities the API returns for them,
-//     and every one is SE-1 (the RLS boundary, on the new write surface).
+//     and every one is SE-1;
+//   · P4: a rep's Signals queue renders exactly the API's active rows for
+//     them, and every card is SE-1 — no foreign territory code anywhere.
 //
 // Requires the API on 127.0.0.1:5777 (this dev server only proxies to it).
 
@@ -36,6 +38,8 @@ const STATIC_SCREENS = [
   { name: "leaderboards-customers", path: "/leaderboards?tab=customers", auth: true },
   { name: "pipeline", path: "/pipeline", auth: true },
   { name: "quotes", path: "/quotes", auth: true },
+  { name: "signals", path: "/signals", auth: true },
+  { name: "ask", path: "/ask", auth: true },
 ] as const;
 
 async function loginAs(page: Page, email: string): Promise<void> {
@@ -68,7 +72,7 @@ async function overflowPx(page: Page): Promise<number> {
   );
 }
 
-test("tripwire: responsive layout (45) + rep scope (command + pipeline)", async ({
+test("tripwire: responsive layout (55) + rep scope (command + pipeline + signals)", async ({
   browser,
 }) => {
   const authed: BrowserContext = await browser.newContext();
@@ -164,12 +168,31 @@ test("tripwire: responsive layout (45) + rep scope (command + pipeline)", async 
       ? `  PASS  pipeline-scope  (${cardCount} cards, all SE-1)`
       : `  FAIL  pipeline-scope  (${cardCount} cards vs ${apiOpps.length} api, allSe1=${allSe1})`,
   );
+
+  // 3 · P4 Signals — the queue renders exactly the rep's RLS-scoped active
+  // rows, and every one is SE-1 (no foreign territory code on any card).
+  const apiSignals = await repPage.evaluate(
+    async () =>
+      (await (await fetch("/api/signals?status=active&limit=200")).json())
+        .items as { territory_code: string }[],
+  );
+  const signalsAllSe1 = apiSignals.every((s) => s.territory_code === "SE-1");
+  await repPage.goto("/signals");
+  await waitReady(repPage);
+  const signalCardCount = await repPage.getByTestId("signal-card").count();
+  const signalsScopeOk = signalsAllSe1 && signalCardCount === apiSignals.length;
+  console.log(
+    signalsScopeOk
+      ? `  PASS  signals-scope  (${signalCardCount} cards, all SE-1)`
+      : `  FAIL  signals-scope  (${signalCardCount} cards vs ${apiSignals.length} api, allSe1=${signalsAllSe1})`,
+  );
   await repPage.close();
 
   console.log(
     `\nTRIPWIRE ${pass}/${expected} layout ${failures.length === 0 ? "PASS" : "FAIL"} · ` +
       `command-scope ${commandScopeOk ? "PASS" : "FAIL"} · ` +
-      `pipeline-scope ${pipelineScopeOk ? "PASS" : "FAIL"}` +
+      `pipeline-scope ${pipelineScopeOk ? "PASS" : "FAIL"} · ` +
+      `signals-scope ${signalsScopeOk ? "PASS" : "FAIL"}` +
       (failures.length ? `\n  failures: ${failures.join(", ")}` : ""),
   );
 
@@ -179,6 +202,9 @@ test("tripwire: responsive layout (45) + rep scope (command + pipeline)", async 
   expect(failures, `layout overflow: ${failures.join("; ")}`).toHaveLength(0);
   expect(commandScopeOk, "rep must see exactly one tile, SE-1").toBe(true);
   expect(pipelineScopeOk, "rep pipeline must show only their SE-1 opps").toBe(
+    true,
+  );
+  expect(signalsScopeOk, "rep signals queue must show only SE-1 cards").toBe(
     true,
   );
 });

@@ -10,12 +10,12 @@ use axum::Json;
 use chrono::{DateTime, NaiveDate, Utc};
 use domain::{AccountStatus, ActivityKind, OppStage};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use uuid::Uuid;
 
 use crate::auth::SessionUser;
 use crate::error::ApiError;
 use crate::rls::rls_tx;
+use crate::routes::signals::{account_signals, SignalRow};
 use crate::state::AppState;
 
 const DEFAULT_LIMIT: i64 = 50;
@@ -117,6 +117,9 @@ pub async fn list_accounts(
 
 const ORDERS_CAP: i64 = 20;
 const ACTIVITIES_CAP: i64 = 50;
+/// R14: the 360 shows the account's signals — active first, score DESC — with
+/// the recent_orders cap pattern.
+const SIGNALS_CAP: i64 = 20;
 
 #[derive(Serialize)]
 struct MoneyTriple {
@@ -215,9 +218,10 @@ pub struct AccountDetail {
     recent_orders: Vec<OrderBrief>,
     opportunities: Vec<OppBrief>,
     activities: ActivitiesPage,
-    /// Empty until P4 — the client renders the designed empty state, never an
-    /// error (R5).
-    signals: Vec<Value>,
+    /// P4 (R14): the account's signals — active first, then score DESC,
+    /// capped at SIGNALS_CAP — in the SAME enriched shape as GET /api/signals.
+    /// An account with none gets an empty array (the designed empty state).
+    signals: Vec<SignalRow>,
 }
 
 fn leakage_pct(gross: i64, net: i64) -> Option<f64> {
@@ -350,6 +354,8 @@ pub async fn get_account(
     .fetch_one(&mut *tx)
     .await?;
 
+    let signals = account_signals(&mut tx, id, SIGNALS_CAP).await?;
+
     tx.commit().await?;
 
     Ok(Json(AccountDetail {
@@ -378,7 +384,7 @@ pub async fn get_account(
             offset: 0,
             total: activity_total,
         },
-        signals: Vec::new(),
+        signals,
     }))
 }
 

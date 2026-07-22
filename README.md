@@ -305,6 +305,52 @@ Setup: W1/W2/W3 above running, then browse to http://127.0.0.1:5177.
      at the right edge, or a horizontal scrollbar on the page itself.
 ```
 
+## P4 — Signals + AI
+
+**The four signal generators (all deterministic, all derived).** After every
+seed — and on demand — `generate_signals()` derives the queue from table
+data alone: **reorder_due** (units inside `reorder_lookahead_days` of their
+cadence due date, plus any unit whose telemetry `filter_life_pct` is at or
+under the trigger), **defection_risk** (metric 7's view verbatim: silence
+past `expected_changeout_months × 1.5`, scored by cycles-missed × annual
+value), **conquest** (competitor units with no order history, cross-referenced
+through `filter_fits` to our best-fitting replacement SKU), and
+**discount_anomaly** (order lines in the trailing window whose discount sits
+more than 2σ above their family's median). Every card carries its reasons on
+its face; thresholds live in the `signal_policy` config row (survives
+reseeds); reruns upsert by a deterministic `dedupe_key` — no duplicates, no
+touching assigned/actioned/dismissed cards, zero audit noise when nothing
+changed.
+
+Regenerate on demand (admin session): `POST /api/admin/generate-signals` —
+one PowerShell line, after logging in as priya.nair@plenum.demo:
+
+```
+cd "C:\AI_Projects\Camfil CRM"; $s = New-Object Microsoft.PowerShell.Commands.WebRequestSession; Invoke-RestMethod -Uri "http://127.0.0.1:5777/api/auth/login" -Method Post -ContentType "application/json" -Body '{"email":"priya.nair@plenum.demo","password":"demo-plenum-2026"}' -WebSession $s | Out-Null; Invoke-RestMethod -Uri "http://127.0.0.1:5777/api/admin/generate-signals" -Method Post -WebSession $s | ConvertTo-Json -Depth 4
+```
+
+**AI env keys (.env only — never commit a key).** Copy `.env.example`; the
+four P4 keys are `ANTHROPIC_API_KEY` (leave empty to run with AI off —
+every screen still works), `ANTHROPIC_MODEL` (default `claude-sonnet-5`),
+`AI_ASK_ENABLED`, `AI_DISCOUNT_ENABLED` (default true). Put your key in
+`.env`, never in any committed file — `.env` is gitignored and the key never
+reaches the client bundle or a log line.
+
+**Ask PLENUM** (`/ask`, or Ctrl-K anywhere): your question becomes ONE
+PostgreSQL SELECT over a whitelisted semantic layer — `v_order_facts`, the
+four `v_*_period` rollup views, and `v_defection_risk` — validated against
+the real SQL AST (single statement, SELECT-only, whitelisted relations
+only), executed inside YOUR read-only RLS session with a 5s timeout and an
+injected LIMIT 500, and shown with the SQL itself as receipts. A rep cannot
+ask their way into another territory. With no key the page serves the
+saved-question library instead, and nothing errors.
+
+Acceptance walk: the P4 unit's 12 checks (Signals queue + Ridgeline card,
+draft-from-signal, scope, write-backs, idempotent regeneration, Command
+rewire, flag-off/flag-on Ask, recommender degradation, telemetry, tripwire
+55+3, reseed) live in the session report and HANDOFF-LOG — run them from
+docs/HANDOFF-LOG.md's newest entry.
+
 ## Development
 
 ```

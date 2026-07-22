@@ -1,0 +1,193 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id,\n                  s.type AS \"signal_type: SignalType\",\n                  s.status AS \"status: SignalStatus\",\n                  s.score::float8 AS \"score!\",\n                  s.reasons,\n                  s.account_id,\n                  a.name AS account_name,\n                  t.code AS \"territory_code!\",\n                  s.site_id,\n                  COALESCE(uf.site_label, os.city || ', ' || os.state) AS site_label,\n                  s.installed_unit_id,\n                  uf.serial AS \"serial?\",\n                  CASE WHEN s.type = 'conquest' THEN bf.product_id\n                       ELSE uf.cartridge_product_id END AS \"cartridge_product_id?\",\n                  CASE WHEN s.type = 'conquest' THEN bf.sku\n                       ELSE uf.cartridge_sku END AS \"cartridge_sku?\",\n                  uf.cartridge_count AS \"cartridge_count?\",\n                  CASE WHEN s.type = 'conquest'\n                       THEN round(uf.cartridge_count::numeric * bf.list_price_cents * 12\n                                  / COALESCE(uf.expected_changeout_months,\n                                             sp.conquest_default_changeout_months))::bigint\n                       WHEN s.installed_unit_id IS NOT NULL\n                       THEN round(uf.cartridge_count::numeric\n                                  * COALESCE(uf.cartridge_list_unit_cents, 0) * 12\n                                  / COALESCE(uf.expected_changeout_months,\n                                             sp.conquest_default_changeout_months))::bigint\n                       ELSE NULL END AS \"annual_value_cents?\",\n                  s.order_line_id,\n                  s.assigned_to,\n                  au.name AS \"assignee_name?\",\n                  s.outcome,\n                  s.dismissed_reason,\n                  s.opened_at,\n                  s.assigned_at,\n                  s.actioned_at,\n                  s.dismissed_at\n           FROM signals s\n           JOIN accounts a ON a.id = s.account_id\n           JOIN territories t ON t.id = a.territory_id\n           CROSS JOIN signal_policy sp\n           LEFT JOIN v_unit_facts uf ON uf.unit_id = s.installed_unit_id\n           LEFT JOIN sites os ON os.id = s.site_id\n           LEFT JOIN users au ON au.id = s.assigned_to\n           LEFT JOIN LATERAL (\n               SELECT p.id AS product_id, p.sku, p.list_price_cents\n               FROM products p\n               WHERE s.type = 'conquest'\n                 AND p.kind = 'consumable'\n                 AND p.filter_fits @> ARRAY[uf.unit_family]\n               ORDER BY p.list_price_cents DESC, p.sku ASC\n               LIMIT 1\n           ) bf ON true\n           WHERE CASE WHEN $1::text = 'active' THEN s.status IN ('open', 'assigned')\n                      ELSE s.status::text = $1 END\n             AND ($2::text IS NULL OR s.type::text = $2)\n           ORDER BY s.score DESC, s.id ASC\n           LIMIT $3 OFFSET $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "signal_type: SignalType",
+        "type_info": {
+          "Custom": {
+            "name": "signal_type",
+            "kind": {
+              "Enum": [
+                "reorder_due",
+                "defection_risk",
+                "conquest",
+                "discount_anomaly"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status: SignalStatus",
+        "type_info": {
+          "Custom": {
+            "name": "signal_status",
+            "kind": {
+              "Enum": [
+                "open",
+                "assigned",
+                "actioned",
+                "dismissed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "score!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "reasons",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "account_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "site_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "site_label",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "installed_unit_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 11,
+        "name": "serial?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "cartridge_product_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 13,
+        "name": "cartridge_sku?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "cartridge_count?",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 15,
+        "name": "annual_value_cents?",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 16,
+        "name": "order_line_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 17,
+        "name": "assigned_to",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 18,
+        "name": "assignee_name?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "outcome",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "dismissed_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "opened_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 22,
+        "name": "assigned_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 23,
+        "name": "actioned_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 24,
+        "name": "dismissed_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      true,
+      null,
+      true,
+      true,
+      null,
+      null,
+      true,
+      null,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "146b470741aae812af3d7518f312e4b5b514cc243d2f9a2ffb70514092aa4027"
+}

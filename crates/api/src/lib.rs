@@ -1,6 +1,7 @@
 //! PLENUM API library. The binary in main.rs is a thin shell over this so
 //! integration tests can build the exact same router in-process.
 
+pub mod ai;
 pub mod auth;
 pub mod error;
 pub mod rls;

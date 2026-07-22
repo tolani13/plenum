@@ -4,7 +4,7 @@
 //! (Tier-3 verification for auth/tenancy — spec §4 non-negotiable.)
 
 use api::routes;
-use api::state::AppState;
+use api::state::{AiConfig, AppState};
 use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
 use axum::Router;
@@ -26,7 +26,24 @@ async fn test_app() -> Router {
         .connect(&url)
         .await
         .expect("test database reachable — run: docker compose up -d && cargo run --bin seed");
-    routes::app(AppState { pool }, false)
+    // P4: AppState grew an AiConfig. Tests pin a hermetic no-key config so
+    // the suite NEVER makes a vendor call regardless of what .env holds.
+    routes::app(
+        AppState {
+            pool,
+            ai: test_ai_config(),
+        },
+        false,
+    )
+}
+
+fn test_ai_config() -> AiConfig {
+    AiConfig {
+        api_key: None,
+        model: "claude-sonnet-5".to_string(),
+        ask_flag: true,
+        discount_flag: true,
+    }
 }
 
 async fn body_json(response: axum::response::Response) -> Value {

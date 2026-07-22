@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE signals\n           SET status = 'assigned', assigned_to = $2,\n               assigned_at = COALESCE(assigned_at, now())\n           WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9e3fb4cce4b68151a07709307a70c1c6470a65aa1926a63979d4a1a5e1636af2"
+}

@@ -1,13 +1,15 @@
 // Account 360 (spec §8 screen 5) — the installed-base timeline as the hero,
 // plus header KPIs (cumulative gross/net/leakage), recent orders, opportunities,
-// the activity log (writable), contacts, and the designed signals-empty state
-// (P4). Reached by clicking a customer/card/inbox row — not a rail entry (R7).
+// the activity log (writable), contacts, and — P4 (R14) — the account's
+// signals as compact receipt cards linking to the queue; the designed empty
+// state remains for accounts with none. Reached by clicking a
+// customer/card/inbox row — not a rail entry (R7).
 
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { money, percent } from "../lib/format";
-import type { ActivityKind } from "../lib/types";
+import type { ActivityKind, SignalRow } from "../lib/types";
 import { useAccountDetail, useCreateActivity } from "../lib/crm";
 import { useScreenReady } from "../lib/useScreenReady";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "../components/states";
@@ -44,6 +46,58 @@ function Panel({
 }
 
 const KINDS: ActivityKind[] = ["call", "visit", "email", "note"];
+
+const SIGNAL_LABEL: Record<SignalRow["type"], string> = {
+  reorder_due: "reorder due",
+  defection_risk: "defection risk",
+  conquest: "conquest",
+  discount_anomaly: "discount anomaly",
+};
+
+/** Compact receipt card (R14) — type, status, score, and the reasons inline;
+ *  the queue is one click away. */
+function SignalCard({ s }: { s: SignalRow }) {
+  const active = s.status === "open" || s.status === "assigned";
+  const tone =
+    s.type === "defection_risk"
+      ? "text-alarm"
+      : s.type === "discount_anomaly"
+        ? "text-warn"
+        : "text-data";
+  return (
+    <Link
+      to="/signals"
+      data-testid="account-signal"
+      className="block rounded-lg border border-seam bg-surface-2 p-3 transition-colors hover:border-seam-strong"
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span className={`nameplate text-2xs ${tone}`}>
+          {SIGNAL_LABEL[s.type]}
+        </span>
+        <span className="tabular text-sm text-warn" title="signal score">
+          {s.score.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </span>
+      </div>
+      <div className="mt-0.5 text-2xs text-text-dim">
+        {s.serial ? `${s.serial} · ` : ""}
+        {active ? s.status : `${s.status}${s.outcome ? ` · ${s.outcome}` : ""}`}
+      </div>
+      <ul className="mt-2 space-y-0.5 border-t border-seam/60 pt-2">
+        {s.reasons.map((r, i) => (
+          <li key={i} className="flex justify-between gap-2 text-2xs">
+            <span className="nameplate shrink-0 text-text-dim">{r.label}</span>
+            <span className="min-w-0 truncate text-right text-text">
+              {r.detail}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Link>
+  );
+}
 
 function ActivityLog({ accountId }: { accountId: string }) {
   const account = useAccountDetail(accountId);
@@ -254,7 +308,15 @@ export function Account360() {
       </div>
 
       <Panel title="Signals">
-        <EmptyPanel message="No signals yet — the signal engine (reorder / defection / conquest) lands in P4." />
+        {a.signals.length === 0 ? (
+          <EmptyPanel message="No signals for this account — the radar is quiet." />
+        ) : (
+          <div className="grid grid-cols-1 gap-2 min-[700px]:grid-cols-2 min-[1100px]:grid-cols-3">
+            {a.signals.map((s) => (
+              <SignalCard key={s.id} s={s} />
+            ))}
+          </div>
+        )}
       </Panel>
     </div>
   );

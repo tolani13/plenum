@@ -1,11 +1,24 @@
 // App shell: a left rail on wide screens, a wrapping top bar on narrow ones
-// (width behaviour, not device sniffing). Nav is Command + Leaderboards ONLY —
-// no dead links to unbuilt screens. The user chip proves identity at a glance
-// (name · role · scope codes); logout purges the cache on the way out.
+// (width behaviour, not device sniffing). Nav carries only BUILT screens —
+// no dead links. The user chip proves identity at a glance (name · role ·
+// scope codes); logout purges the cache on the way out.
+//
+// P4: Cmd-K / Ctrl-K is the global Ask PLENUM affordance (R9) — it jumps to
+// /ask and focuses the question input (already there → just re-focuses).
 
-import { NavLink, Outlet } from "react-router";
-import { BarChart3, Columns3, FileText, LayoutDashboard, LogOut } from "lucide-react";
+import { useEffect } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import {
+  BarChart3,
+  Columns3,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  MessageSquareText,
+  Radar,
+} from "lucide-react";
 import { useMe, useLogout } from "../auth/auth";
+import { ASK_FOCUS_EVENT } from "../ask/Ask";
 
 function scopeLabel(territories: string[]): string {
   if (territories.length === 8) return "ALL";
@@ -43,6 +56,23 @@ function NavItem({
 export function Shell() {
   const me = useMe();
   const logout = useLogout();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if (location.pathname === "/ask") {
+          window.dispatchEvent(new Event(ASK_FOCUS_EVENT));
+        } else {
+          navigate("/ask");
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navigate, location.pathname]);
 
   return (
     <div className="flex min-h-screen flex-col bg-bg text-text md:flex-row">
@@ -71,6 +101,16 @@ export function Shell() {
             to="/quotes"
             icon={<FileText size={15} strokeWidth={2} />}
             label="Quotes"
+          />
+          <NavItem
+            to="/signals"
+            icon={<Radar size={15} strokeWidth={2} />}
+            label="Signals"
+          />
+          <NavItem
+            to="/ask"
+            icon={<MessageSquareText size={15} strokeWidth={2} />}
+            label="Ask"
           />
         </nav>
 

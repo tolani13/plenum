@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\" FROM signals s\n           WHERE CASE WHEN $1::text = 'active' THEN s.status IN ('open', 'assigned')\n                      ELSE s.status::text = $1 END\n             AND ($2::text IS NULL OR s.type::text = $2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0828233f8a886782d816d7583c08dfb635b12f4352ef8bee4f826f9399606726"
+}

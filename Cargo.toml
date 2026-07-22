@@ -33,3 +33,13 @@ uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 rust_decimal = "1"
 dotenvy = "0.15"
+# P4 (pre-authorized by the unit constraints):
+# reqwest — the spec-§7-named HTTP client for the ONE backend Anthropic call
+# (deferred here from P1). MIT/Apache-2.0. No default features: rustls only
+# (no native-tls/openssl), json only — the smallest client that can speak the
+# vendor API.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# sqlparser (sqlparser-rs) — real AST validation for Ask PLENUM instead of
+# regex theater. Apache-2.0. The visitor feature drives the whitelist walk
+# (every relation reference, in any clause, at any depth).
+sqlparser = { version = "0.62", features = ["visitor"] }

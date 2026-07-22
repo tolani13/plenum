@@ -12,6 +12,8 @@ pub mod opportunities;
 pub mod policy;
 pub mod products;
 pub mod quotes;
+pub mod signals;
+pub mod telemetry;
 
 use axum::extract::Request;
 use axum::middleware::Next;
@@ -68,6 +70,19 @@ pub fn app(state: AppState, cookie_secure: bool) -> Router {
             "/api/activities",
             get(activities::list_activities).post(activities::create_activity),
         )
+        .route("/api/signals", get(signals::list_signals))
+        .route("/api/signals/summary", get(signals::signals_summary))
+        .route("/api/signals/assignees", get(signals::signal_assignees))
+        .route("/api/signals/{id}/assign", post(signals::assign_signal))
+        .route("/api/signals/{id}/action", post(signals::action_signal))
+        .route("/api/signals/{id}/dismiss", post(signals::dismiss_signal))
+        .route("/api/ai/status", get(crate::ai::ai_status))
+        .route("/api/ai/ask", post(crate::ai::ask))
+        .route(
+            "/api/ai/discount-recommendation",
+            post(crate::ai::discount_recommendation),
+        )
+        .route("/api/telemetry/filter-life", post(telemetry::filter_life))
         .route("/api/metrics/territories", get(metrics::territories))
         .route("/api/metrics/leaderboard", get(metrics::leaderboard))
         .route("/api/metrics/items", get(metrics::items))
@@ -76,6 +91,10 @@ pub fn app(state: AppState, cookie_secure: bool) -> Router {
         .route("/api/metrics/coverage", get(metrics::coverage))
         .route("/api/metrics/defection", get(metrics::defection))
         .route("/api/admin/refresh-rollups", post(admin::refresh_rollups))
+        .route(
+            "/api/admin/generate-signals",
+            post(signals::generate_signals),
+        )
         .fallback(|| async { ApiError::NotFound })
         .layer(axum::middleware::from_fn(trace_requests))
         .layer(session_layer)

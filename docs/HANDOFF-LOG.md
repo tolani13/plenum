@@ -4,6 +4,233 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-20 · P4 Signals + AI
+
+- **Unit:** P4 (four deterministic signal generators + queue with write-backs,
+  Command signal rewire, Ask PLENUM + discount recommender behind flags,
+  telemetry ingest stub) — branch `p4-signals-ai` from main `964749f`. Tier 3,
+  one-and-done. Repo LOCAL-ONLY.
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+- **Architect rulings recorded (R1–R14, verbatim intent; PR1–PR8 provenance:
+  production-conversion seeds, D.'s directive 2026-07-20 — flip readiness
+  without audition risk):**
+  - **R1 (PR1) — Generators read the world, not the script.** All four derive
+    ONLY from table data (cadence math over v_unit_facts, v_defection_risk
+    verbatim, filter_fits cross-reference, order-line statistics). No seed
+    constant or account-name special case anywhere in generator SQL/Rust — the
+    Ridgeline card EMERGES. Proven by the fixture test: invented accounts/
+    units/orders inside a rolled-back transaction produce all five expected
+    cards (incl. the conquest ecm-fallback and telemetry branches) with the
+    expected dedupe keys, reasons, and exact scores.
+  - **R2 (PR2) — Generation is an idempotent, re-runnable job.**
+    `generate_signals()` — plain invoker-rights plpgsql in 0012 (the
+    refresh_rollups() shape MINUS SECURITY DEFINER; nothing needs definer
+    rights), EXECUTE revoked from PUBLIC, granted to plenum_app, returning
+    per-type (inserted, updated). Deterministic identity via the new
+    `dedupe_key` + UNIQUE index: `reorder_due:<unit>:<due_date>` ·
+    `reorder_due:<unit>:telemetry` · `defection_risk:<unit>:<due_date>` ·
+    `conquest:<unit>` · `discount_anomaly:<order_line>`. Upsert = INSERT … ON
+    CONFLICT DO UPDATE (score/reasons) WHERE status='open' AND something IS
+    DISTINCT — reruns never duplicate, never touch assigned/actioned/
+    dismissed, and a no-change rerun writes ZERO update rows (zero audit
+    noise; proven: second same-day run all-zero, audit delta 0). Trigger:
+    POST /api/admin/generate-signals (role=admin, the refresh pattern); the
+    seed runs the same function post-refresh. Stale-predicate auto-expiry
+    parked to P5 by ruling.
+  - **R3 (PR3) — Thresholds are config rows.** `signal_policy` singleton in
+    0012 (discount_policy pattern: boolean PK, CHECKs, seeded in-migration,
+    NOT in the seed truncate list, SELECT grant): defection_multiplier 1.50 ·
+    discount_sigma 2.00 · reorder_lookahead_days 30 · discount_window_days 90
+    (PRE-5's first non-zero rung — 176 candidates at 90d, no laddering
+    needed) · conquest_default_changeout_months 12 · telemetry_low_pct 20.00.
+    0012 also CREATE OR REPLACEs v_defection_risk with the IDENTICAL column
+    list, the literal 1.5 becoming the config multiplier — byte-identical
+    output at the default (P1 metrics tests untouched and green). Aligning
+    /metrics/leakage's 2σ feed to signal_policy stays PARKED to P5;
+    metrics.rs is byte-identical this unit.
+  - **R4 — The four generators (exact math, 30.44 days/month everywhere).**
+    reorder_due: cadence window (due within lookahead AND under the
+    defection boundary — the lanes partition cleanly) scored value-ranked ×
+    overdue-boosted, PLUS the telemetry branch (filter_life_pct ≤ threshold,
+    one live card per unit, ecm falling back to the config default);
+    defection_risk: SELECT FROM v_defection_risk verbatim, the view's score;
+    conquest: competitor units with no order history × best fitting
+    consumable (highest list, tie-break sku ASC), fallback cadence marked in
+    the receipts when it fired; discount_anomaly: per-family
+    percentile_cont(0.5)/stddev_pop over ALL history, candidates in the
+    trailing window above median + σ×spread, score = excess-leakage dollars
+    on the line. reasons[] weights = the raw numeric term per label
+    (days/cycles/months/dollars/pct — documented in the 0012 comment).
+  - **R5 — Signal write surface.** GET /api/signals (status
+    open|assigned|actioned|dismissed|active, active = open ∪ assigned
+    default; type filter; envelope, limit max 200; score DESC id ASC;
+    enriched via RLS-scoped joins — account/territory/site/serial/cartridge
+    (conquest rows re-derive the SAME deterministic best-fit lateral the
+    generator uses) + assignee + lifecycle timestamps + annual_value_cents
+    for the R6 composition). POST :id/assign (assignee must carry the
+    signal's territory in v_user_scope — 422; re-assign allowed; assigned_at
+    = first assignment) · :id/action (outcome required) · :id/dismiss
+    (reason required); actioned/dismissed TERMINAL (422 out); out-of-scope =
+    404 via RLS; audit rides the 0006 trigger untouched. Disclosed
+    beyond-the-list additions (P3 pattern): GET /api/signals/summary
+    ({total, by_type, territories[]} over open ∪ assigned — Command's feed)
+    and GET /api/signals/assignees?account_id= (the R6 picker's roster:
+    users whose v_user_scope holds the account's territory; account
+    RLS-gated 404 — no probing foreign teams; no other user directory
+    exists).
+  - **R6 — Signals queue UI** (screen 4): /signals + rail entry; four lanes
+    in type order collapsing 4→2→1; Active|Actioned|Dismissed filter; cards
+    carry account link, territory chip, site/serial, score, the reasons ON
+    the card, status/assignee chip; inline Assign (self for reps, lazy
+    scope-valid picker for RM/VP/admin), Draft Quote (not on anomaly), Log
+    Call (POST /api/activities kind=call + action outcome call_logged),
+    Dismiss (reason dialog, refuses empty). Draft-quote-from-signal is
+    CLIENT-SIDE COMPOSITION of P3 machinery: pick the account's open opp
+    (highest amount, then lowest id; Ridgeline has exactly one — the
+    win-back), else POST /api/opportunities (filter-program, amount = the
+    signal's annual value) + PATCH stage→qualified (the create endpoint
+    seeds stage=lead and is prior-phase-frozen — the two-call composition
+    honors the ruling without a backend change); builder opens pre-filled
+    (cartridge/best-fit product, qty = cartridge_count); on creation the
+    signal is actioned `quote_drafted:<quote_id>`; drafting still flips the
+    opp to quoted via the P3 rule. Lane/card/kpi testids shipped.
+  - **R7 — Command rewire.** KPI 4 = OPEN SIGNALS (summary.total; sub-line
+    by-type digest; testid kpi-signals replaces kpi-defection); Territory
+    Board tiles gain the open-signal count (matched by territory CODE — the
+    P2 metrics payload exposes code, not id; the summary carries both;
+    codes are unique so the match is equivalent). Command stops calling
+    useDefection — the drawer now owns that fetch lazily (drill-only);
+    /metrics/defection itself untouched. Gross/net flip unchanged; signal
+    counts basis-invariant.
+  - **R8 (PR4) — AI behind ONE seam.** crates/api/src/ai/: client.rs owns
+    the ONLY Anthropic call (reqwest, api.anthropic.com/v1/messages,
+    anthropic-version 2023-06-01, 15s connect+request); env at startup into
+    AppState: ANTHROPIC_API_KEY (env-only secret; only its PRESENCE is
+    logged), ANTHROPIC_MODEL default claude-sonnet-5, AI_ASK_ENABLED /
+    AI_DISCOUNT_ENABLED default true. Effective ask = flag AND key; the
+    discount flag alone gates its endpoint, the key only its narrative.
+    error.rs gains AiUnavailable → 503 `ai_unavailable` in the house
+    envelope; vendor failures surface as that, never a 500, never an error
+    screen. GET /api/ai/status → {ask, discount} (authed) gates the UI.
+  - **R9 (PR5) — Ask PLENUM with production controls.** POST /api/ai/ask:
+    server-composed system prompt (0008/0010 whitelisted view schemas + §5
+    dictionary digest + hard rules) → model SQL → sqlparser AST validation
+    (exactly one statement; Query-only; SELECT INTO/locks refused; every
+    relation ∈ {v_order_facts, v_territory_period, v_rep_period,
+    v_product_period, v_customer_period, v_defection_risk} with
+    query-defined CTEs allowed and their bodies walked; FROM-position table
+    functions refused; a small function denylist — set_config, backend
+    signals, file reads, the *_to_xml family — belt-and-braces under the
+    grants) → execution ONLY inside the caller's READ-ONLY rls transaction
+    (rls_readonly_tx — the read-only SET ordered before the GUC
+    set_config, per the ruling) with SET LOCAL statement_timeout='5s',
+    wrapped `SELECT row_to_json(plenum_ask) FROM ( sql ) plenum_ask LIMIT
+    500` (truncated flag at 500; ordered columns from a server-side
+    describe). Validation/timeout = typed 422; the CANONICAL validated SQL
+    is always in the 200 (receipts). The validator is a pure function with
+    its own adversarial matrix; the one runtime sqlx::query use is this
+    execution path, documented in place. UI: /ask + nav + global
+    Cmd-K/Ctrl-K focus (Shell); table (contained scroll) + recharts bar
+    (tokens-only via CSS vars; one label col + ≥1 numeric + ≤50 rows;
+    *_cents charted in dollars) + the SQL receipts block; the 7-question
+    library ALWAYS renders (each a client-side link to a live screen); ask
+    off (flag/key/503) = the quiet note + library, never an error screen.
+    recharts owed decision RESOLVED: USED (first bundle entry; ~774 KB main
+    chunk noted for P5 code-split).
+  - **R10 — Discount recommender.** POST /api/ai/discount-recommendation
+    (authed; 503 when the flag is off): comparables under the CALLER'S
+    rls_tx — same family × account industry × same order-of-magnitude
+    line-gross band (log10 bucket of cents, computed digit-exact, stated in
+    the receipts as band_label) → {count, median/p25/p75, ≤10 sample lines};
+    narrative from the R8 seam when a key is present; without one (or on
+    vendor failure) narrative:null, degraded:true — the spec's exact
+    degradation. A rep's comparables come from their own scope — disclosed
+    behavior. UI: per-line COMPS button in the builder (on demand, never per
+    keystroke), hidden entirely when status.discount is false.
+  - **R11 (PR6) — Identity single-seam.** Honored: no P4 code reads
+    session/auth internals outside SessionUser + the rls.rs helpers; the
+    read-only variant lives IN rls.rs (the seam), not in ai/.
+  - **R12 (PR7) — Seed framed as importer.** Comment-level seam markers in
+    seed main.rs: world-generation vs DB-load boundary; the load path marked
+    as the future ERP-extract-loader seam. No loader built.
+  - **R13 (PR8) — Telemetry ingest stub: BUILT** (not cut). POST
+    /api/telemetry/filter-life — role=admin (the integration-feed identity),
+    422 outside 0–100 / non-numeric, 404 unknown serial, updates
+    installed_units.filter_life_pct, echoes {unit_id, serial,
+    filter_life_pct}. Written as the inbound-feed template. The R4 telemetry
+    branch consumes it on the next generation.
+  - **R14 — Account 360 signals fill.** accounts.rs replaces `signals: []`
+    with the account's signals (active first, score DESC, cap 20) in the
+    SAME enriched shape as the list (shared loader in signals.rs);
+    Account360.tsx renders compact receipt cards linking to /signals; the
+    designed empty state remains.
+- **Consequential touchpoints beyond the prompt's named list (all
+  rulings-driven, disclosed):** rls.rs (+rls_readonly_tx — R9's ordered
+  read-only helper, kept in the identity seam per R11), QuoteBuilder.tsx
+  (R6 prefill + R10 COMPS panel), Account360.tsx (R14 render),
+  TerritoryBoard.tsx (prop pass-through for the R7 tile counts),
+  DrillDrawer.tsx (owns useDefection lazily so Command stops calling it —
+  R7 verbatim), the three prior test harnesses (AppState gained the ai
+  field; they pin a hermetic keyless AiConfig so `cargo test` can NEVER
+  reach the vendor regardless of .env).
+- **Flagged discrepancy (report-don't-redecide):** acceptance check 7's
+  "builder shows NO comps button" with only the key empty contradicts R8/R10
+  (flag alone gates the endpoint/button; key gates the narrative) AND check
+  10's "key removed → same panel, comparables only". Shipped the R8/R10
+  behavior; check 7's comps clause is observable verbatim by also setting
+  AI_DISCOUNT_ENABLED=false.
+- **Shipped:** migrations/0012_signals_ai.sql (signals dedupe_key +
+  order_line_id + unique index; signal_policy seeded config;
+  v_defection_risk over the config row; generate_signals() + grants);
+  crates/api/src/ai/{mod,client,validate}.rs; routes/{signals,telemetry}.rs;
+  error.rs 503 variant; state.rs AiConfig; rls.rs read-only helper; main.rs
+  env load; accounts.rs 360 fill; routes/mod.rs registrations; seed main.rs
+  generation hook + R12 markers; workspace deps reqwest 0.12.28 (MIT/
+  Apache-2.0, default-features off, json+rustls-tls) + sqlparser 0.62.0
+  (Apache-2.0, visitor feature); tests signals_http.rs (8) + ai_http.rs (7)
+  + 7 validator unit tests; web: signals/Signals.tsx, ask/Ask.tsx,
+  lib/{signals,ai}.ts + types, Command/KpiRow/Tile/TerritoryBoard/
+  DrillDrawer rewire, Shell nav + Cmd-K, App routes, QuoteBuilder prefill +
+  COMPS, Account360 signals panel, tripwire 11×5 + signals-scope;
+  .env.example AI keys; .sqlx regenerated; README P4 section; this log;
+  master-plan; CLAUDE.md.
+- **Checks status (outputs in the session report):** PRE-1…PRE-6 PASS
+  (frozen anchors byte-identical; Ridgeline defection fuel with
+  FLT-STATSAFE-GS3 ×32 and the $34,000 win-back opp; 28 conquest rows incl.
+  Alpenglow's three; 38 reorder candidates; anomaly rung 90d=176; .env
+  ignored, no key material in tree). scripts/check.sh ALL CHECKS PASSED
+  (fmt · clippy -D warnings · sqlx prepare --check · 56 tests = 12 domain +
+  7 validator + 22 prior HTTP + 8 signals_http + 7 ai_http). Two seed runs
+  byte-identical incl. same-day signal counts. npm run build clean (tsc
+  strict). Tripwire 55/55 layout + command-scope + pipeline-scope +
+  signals-scope PASS. Browser-driven internal walk: Ridgeline card #1 in
+  the defection lane with all four receipts; Draft Quote opened the builder
+  on the win-back opp pre-filled FLT-STATSAFE-GS3 ×32; signal flipped
+  actioned `quote_drafted:<quote_id>`; Command KPI OPEN SIGNALS + tile
+  counts live; /ask off-state + 7-link library.
+- **NEW ANCHORS:** frozen set unchanged (orders 17353/11556020473 ·
+  order_lines 25497/−166812187229 · opportunities 16/3367519569 · mv
+  120/195/1699/614 · audit_log 17 at seed). CLOCK-DRIFTING (recompute,
+  never pin): per-type signal counts — build-day (UTC 2026-07-21) values
+  38 reorder / 12 defection / 28 conquest / 173 anomaly = 251 TOTAL
+  (the anomaly window slides daily; scores/days-silent drift daily; the
+  dry-run earlier the same evening read 176 anomalies across the UTC date
+  tick — the class in action). audit_log growth: +251 signal-INSERT rows
+  after the first post-seed generation (audit = 17 at the seed's printed
+  count, before the hook fires); test-suite runs add write-back/restore
+  audit rows until the next reseed.
+- **New dependencies:** reqwest 0.12.28 (MIT OR Apache-2.0; ~min-features)
+  and sqlparser 0.62.0 (Apache-2.0; sqlparser-rs; +visitor) — both
+  pre-authorized by the unit constraints; zero new npm packages (recharts
+  ^3.9.2 already installed, now used).
+- **P5-parked (appended):** leakage outlier feed reads signal_policy ·
+  signal auto-expiry when predicates stop holding · recharts owed decision
+  RESOLVED — used by the Ask chart (main bundle ~774 KB; consider
+  code-splitting) · signals/ask lanes could virtualize the VP's ~170-card
+  anomaly lane · main-chunk >500 KB Vite warning.
+- **Phase gate:** pending D.'s acceptance run (12 checks in the session
+  report). Merge record: pending.
+
 ## 2026-07-19 · P3 CRM operational core
 
 - **Unit:** P3 (Account 360 + installed-base timeline, Pipeline kanban with

@@ -1,14 +1,19 @@
-// Territory drill — a right-side drawer composed ENTIRELY from data already
-// fetched (architect resolution 3): no metrics endpoint takes a territory
-// filter, and adding one would be a backend change (banned this unit). It
+// Territory drill — a right-side drawer composed from data already fetched
+// (architect resolution 3): no metrics endpoint takes a territory filter. It
 // shows the tile's full instrument row, its coverage row, and its at-risk
 // units filtered client-side from the defection page. Esc or backdrop closes.
+//
+// P4 (R7): Command itself no longer calls useDefection (its 4th KPI reads
+// the signals summary) — so the drawer owns that fetch now, LAZILY: the
+// defection feed loads only when someone actually drills a tile. The
+// /metrics/defection endpoint is untouched.
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
 import { money, percent, count } from "../lib/format";
+import { useDefection } from "../lib/queries";
 import type { Basis } from "../lib/params";
-import type { CoverageRow, DefectionRow, TerritoryRow } from "../lib/types";
+import type { CoverageRow, TerritoryRow } from "../lib/types";
 
 const DEFECTION_FETCH_CAP = 200;
 
@@ -45,18 +50,16 @@ export function DrillDrawer({
   basis,
   territories,
   coverageRows,
-  defectionRows,
-  defectionTotal,
   onClose,
 }: {
   code: string;
   basis: Basis;
   territories: TerritoryRow[];
   coverageRows: CoverageRow[] | undefined;
-  defectionRows: DefectionRow[] | undefined;
-  defectionTotal: number | undefined;
   onClose: () => void;
 }) {
+  const defection = useDefection();
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -67,11 +70,11 @@ export function DrillDrawer({
 
   const t = territories.find((r) => r.territory_code === code);
   const cov = coverageRows?.find((r) => r.territory_code === code);
-  const atRisk = (defectionRows ?? [])
+  const atRisk = (defection.data?.items ?? [])
     .filter((r) => r.territory_code === code)
     .sort((a, b) => b.score - a.score);
   const capped =
-    defectionTotal !== undefined && defectionTotal > DEFECTION_FETCH_CAP;
+    defection.data !== undefined && defection.data.total > DEFECTION_FETCH_CAP;
 
   return (
     <div className="fixed inset-0 z-50 flex" data-testid="drill-drawer" role="dialog" aria-modal="true">
@@ -146,7 +149,9 @@ export function DrillDrawer({
         </Section>
 
         <Section title={`At-risk units${capped ? " (top 200 by score)" : ""}`}>
-          {atRisk.length === 0 ? (
+          {defection.isLoading ? (
+            <div className="pulse text-2xs text-text-dim">Loading…</div>
+          ) : atRisk.length === 0 ? (
             <div className="text-2xs text-text-dim">
               No units past their reorder cadence in scope.
             </div>

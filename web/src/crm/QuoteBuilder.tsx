@@ -3,14 +3,28 @@
 // leakage, and a LIVE policy verdict that updates as lines change (R10). The
 // client computes net only for display; the server derives every stored price
 // and recomputes the verdict on submit (money law + R3).
+//
+// P4 touches (rulings R6 + R10):
+//   · draft-quote-from-signal prefill — ?product=&qty=&signal= seed the first
+//     line (the signal's cartridge or conquest best-fit, qty = cartridge
+//     count); on successful creation the signal is actioned with outcome
+//     quote_drafted:<quote_id> (best-effort — a failed write-back never
+//     blocks the quote);
+//   · the COMPS panel — on-demand comparables (median/IQR + sample) for one
+//     line via POST /api/ai/discount-recommendation, shown only when
+//     /api/ai/status says the recommender is on; narrative degrades to the
+//     raw table without a key, never an error.
 
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Scale, Trash2 } from "lucide-react";
 import { money, percent } from "../lib/format";
 import { useCreateQuote, useOpportunities, useProducts, useDiscountPolicy } from "../lib/crm";
 import type { QuoteLineInput } from "../lib/crm";
 import { useSubmitQuote } from "../lib/crm";
+import { useActionSignal } from "../lib/signals";
+import { useAiStatus, useDiscountRec } from "../lib/ai";
+import type { DiscountRec } from "../lib/types";
 import { useScreenReady } from "../lib/useScreenReady";
 import { ErrorPanel, LoadingPanel } from "../components/states";
 import { verdictLabel, verdictTier } from "./verdict";
@@ -26,21 +40,101 @@ function lineNet(list: number, disc: number): number {
   return Math.round((list * (100 - disc)) / 100);
 }
 
+function CompsPanel({ rec }: { rec: DiscountRec }) {
+  const c = rec.comparables;
+  return (
+    <div className="rounded-lg border border-seam bg-surface p-4" data-testid="comps-panel">
+      <div className="nameplate text-2xs text-data">Comps</div>
+      <div className="mt-1 text-2xs text-text-dim">
+        {c.family} · {c.industry} · {c.band_label}
+      </div>
+      {c.count === 0 ? (
+        <div className="mt-2 text-xs text-text-dim">
+          No comparable lines in your scope for this cohort.
+        </div>
+      ) : (
+        <>
+          <div className="mt-2 flex items-baseline justify-between text-sm">
+            <span className="text-text-dim">
+              median{" "}
+              <span className="tabular text-text">{percent(c.median_pct, 1)}</span>
+            </span>
+            <span className="text-text-dim">
+              IQR{" "}
+              <span className="tabular text-text">
+                {percent(c.p25, 1)}–{percent(c.p75, 1)}
+              </span>
+            </span>
+            <span className="tabular text-2xs text-text-dim">{c.count} lines</span>
+          </div>
+          <div className="scroll-x mt-2">
+            <table className="w-full text-2xs">
+              <thead>
+                <tr className="border-b border-seam">
+                  <th className="nameplate px-1.5 py-1 text-left text-text-dim">Account</th>
+                  <th className="nameplate px-1.5 py-1 text-right text-text-dim">Gross</th>
+                  <th className="nameplate px-1.5 py-1 text-right text-text-dim">Disc.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {c.sample.map((s, i) => (
+                  <tr key={i} className="border-b border-seam/40 last:border-0">
+                    <td
+                      className="max-w-[9rem] truncate px-1.5 py-1 text-text"
+                      title={`${s.account_name} · ${s.product_sku} × ${s.qty} · ${s.ordered_on}`}
+                    >
+                      {s.account_name}
+                    </td>
+                    <td className="tabular px-1.5 py-1 text-right text-text">
+                      {money(s.gross_cents)}
+                    </td>
+                    <td className="tabular px-1.5 py-1 text-right text-text">
+                      {percent(s.discount_pct, 1)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      {rec.narrative ? (
+        <div className="mt-2 border-t border-seam pt-2 text-xs text-text" data-testid="comps-narrative">
+          {rec.narrative}
+        </div>
+      ) : (
+        <div className="mt-2 border-t border-seam pt-2 text-2xs text-text-dim" data-testid="comps-degraded">
+          Comparables only — the AI narrative is off (no key).
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function QuoteBuilder() {
   const [params] = useSearchParams();
   const oppId = params.get("opp") ?? "";
+  const prefillProduct = params.get("product");
+  const prefillQty = Math.max(1, Number(params.get("qty")) || 1);
+  const signalId = params.get("signal");
   const navigate = useNavigate();
 
   const opps = useOpportunities("all");
   const products = useProducts();
   const policy = useDiscountPolicy();
+  const aiStatus = useAiStatus();
   const createQuote = useCreateQuote();
   const submitQuote = useSubmitQuote();
+  const actionSignal = useActionSignal();
+  const discountRec = useDiscountRec();
 
   const [lines, setLines] = useState<DraftLine[]>([
-    { product_id: "", qty: 1, discount_pct: 0 },
+    prefillProduct
+      ? { product_id: prefillProduct, qty: prefillQty, discount_pct: 0 }
+      : { product_id: "", qty: 1, discount_pct: 0 },
   ]);
   const [error, setError] = useState<string | null>(null);
+  const [compsFor, setCompsFor] = useState<number | null>(null);
 
   const ready =
     (opps.isSuccess || opps.isError) &&
@@ -107,6 +201,18 @@ export function QuoteBuilder() {
       discount_pct: l.discount_pct,
     }));
 
+  const fetchComps = (i: number) => {
+    const l = lines[i];
+    if (!l?.product_id) return;
+    setCompsFor(i);
+    discountRec.mutate({
+      product_id: l.product_id,
+      account_id: opp.account_id,
+      qty: l.qty,
+      discount_pct: l.discount_pct,
+    });
+  };
+
   const persist = async (thenSubmit: boolean) => {
     setError(null);
     if (validLines.length === 0) {
@@ -122,6 +228,18 @@ export function QuoteBuilder() {
         opportunity_id: oppId,
         lines: validLines,
       });
+      // R6: the source signal shows ACTIONED once the draft exists. A failed
+      // write-back is reported but never blocks the drafted quote.
+      if (signalId) {
+        try {
+          await actionSignal.mutateAsync({
+            id: signalId,
+            outcome: `quote_drafted:${quote.id}`,
+          });
+        } catch {
+          setError("Quote drafted, but the signal write-back failed.");
+        }
+      }
       if (thenSubmit) await submitQuote.mutateAsync(quote.id);
       navigate(`/quotes/${quote.id}`);
     } catch (e) {
@@ -130,21 +248,24 @@ export function QuoteBuilder() {
   };
 
   const busy = createQuote.isPending || submitQuote.isPending;
+  const compsOn = aiStatus.data?.discount ?? false;
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-4">
       <div>
         <Link
-          to="/pipeline"
+          to={signalId ? "/signals" : "/pipeline"}
           className="mb-2 inline-flex items-center gap-1 text-2xs text-text-dim hover:text-text"
         >
-          <ArrowLeft size={12} /> <span className="nameplate">Pipeline</span>
+          <ArrowLeft size={12} />{" "}
+          <span className="nameplate">{signalId ? "Signals" : "Pipeline"}</span>
         </Link>
         <h1 className="nameplate-strong text-xl text-text">
           New quote · {opp.account_name}
         </h1>
         <div className="nameplate text-2xs text-text-dim">
           {opp.kind} · {opp.territory_code}
+          {signalId ? " · drafted from a signal" : ""}
         </div>
       </div>
 
@@ -210,6 +331,20 @@ export function QuoteBuilder() {
                       className="tabular w-full rounded border border-seam bg-bg px-2 py-1.5 text-sm text-text outline-none focus:border-seam-strong"
                     />
                   </label>
+                  {compsOn && l.product_id && (
+                    <button
+                      onClick={() => fetchComps(i)}
+                      disabled={discountRec.isPending && compsFor === i}
+                      data-testid="line-comps"
+                      title="Comparable deals for this line"
+                      className="inline-flex items-center gap-1 rounded border border-seam px-2 py-1.5 text-2xs text-data transition-colors hover:bg-surface-2 disabled:opacity-50"
+                    >
+                      <Scale size={13} />
+                      <span className="nameplate">
+                        {discountRec.isPending && compsFor === i ? "…" : "Comps"}
+                      </span>
+                    </button>
+                  )}
                   <button
                     onClick={() => removeLine(i)}
                     className="rounded border border-seam p-1.5 text-text-dim hover:text-alarm"
@@ -269,6 +404,15 @@ export function QuoteBuilder() {
               </div>
             </div>
           </div>
+
+          {compsOn && compsFor !== null && discountRec.data && (
+            <CompsPanel rec={discountRec.data} />
+          )}
+          {compsOn && compsFor !== null && discountRec.isError && (
+            <div className="rounded border border-seam bg-surface px-3 py-2 text-2xs text-text-dim">
+              Comps are unavailable right now.
+            </div>
+          )}
 
           {error && (
             <div className="rounded border border-alarm/40 bg-surface px-3 py-2 text-xs text-alarm">

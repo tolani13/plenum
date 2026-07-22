@@ -23,6 +23,12 @@ use sqlx::postgres::PgPoolOptions;
 /// Dev-only default matching docker-compose.yml; .env overrides.
 const DEFAULT_ADMIN_URL: &str = "postgres://plenum_admin:plenum_dev_admin_pw@localhost:5434/plenum";
 
+// ════════════ WORLD GENERATION (R12 seam marker) ═══════════════════════════
+// Everything below this line is the SYNTHETIC-WORLD side of the seed: pure
+// in-memory generation from a fixed PRNG. In a production conversion this
+// whole function is REPLACED by an ERP-extract reader (same World struct out);
+// the DB-load side (insert::write_all and the derivation hooks in run()) is
+// the part that survives as the loader.
 fn generate_world() -> World {
     let mut rng = StdRng::seed_from_u64(util::SEED);
     let password_hash = people::demo_password_hash(&mut rng);
@@ -132,6 +138,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let world = generate_world();
     println!("ok");
 
+    // ════════════ DB LOAD (R12 seam marker) ════════════════════════════════
+    // From here down is the LOADER side: write the World, then derive
+    // (rollups, signals). This path is the future ERP-extract-loader seam —
+    // production swaps the World's source, not this load-and-derive shape.
     print!("writing (truncate + regenerate, one transaction)... ");
     insert::write_all(&pool, &world).await?;
     println!("ok");
@@ -201,6 +211,27 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     for (matview, row_count) in &rollups {
         println!("  {matview:<24}{row_count:>8} rows");
     }
+
+    // P4: derive signals through the SAME generate_signals() function the
+    // admin endpoint calls (seed runs it as plenum_admin; the endpoint runs
+    // it as plenum_app under an admin session). Signals are DERIVED, never
+    // seeded as rows — the generators must find the story in the tables.
+    //
+    // CLOCK-DRIFTING anchors: every count below depends on CURRENT_DATE
+    // (due windows, silence boundaries, the anomaly recency window). Two runs
+    // the SAME day print identical counts; different days differ by design.
+    // The frozen anchors above (row counts, checksums, mv counts) never move.
+    println!("\nsignals generated via generate_signals():");
+    let generated: Vec<(String, i64, i64)> =
+        sqlx::query_as("SELECT signal_type, inserted, updated FROM generate_signals()")
+            .fetch_all(&pool)
+            .await?;
+    let mut signals_total: i64 = 0;
+    for (signal_type, inserted, updated) in &generated {
+        println!("  {signal_type:<20}{inserted:>6} inserted  {updated:>4} updated");
+        signals_total += inserted;
+    }
+    println!("SIGNALS TOTAL: {signals_total} (clock-drifting: same-day reruns identical; other days differ by design)");
 
     println!(
         "\nLOGINS — password for every user: {}",

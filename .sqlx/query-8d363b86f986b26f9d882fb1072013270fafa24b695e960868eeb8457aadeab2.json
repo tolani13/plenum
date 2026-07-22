@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE signals\n           SET status = 'actioned', outcome = $2, actioned_at = now()\n           WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8d363b86f986b26f9d882fb1072013270fafa24b695e960868eeb8457aadeab2"
+}
