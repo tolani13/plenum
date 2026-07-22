@@ -146,6 +146,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     insert::write_all(&pool, &world).await?;
     println!("ok");
 
+    // Post-load ANALYZE: the wipe+reload leaves planner statistics stale until
+    // autovacuum's next pass (up to ~a minute) — long enough for the first
+    // post-reset clicks to plan without the 0013 index. Derivation-path
+    // maintenance in the same spirit as refresh_rollups(); reads and writes
+    // no table data, so no anchor can move.
+    print!("analyzing (planner statistics)... ");
+    sqlx::query("ANALYZE").execute(&pool).await?;
+    println!("ok");
+
     // Counts come from the database, not from memory — no proof, no run.
     println!("\nrow counts (queried back from the database):");
     let tables = [
@@ -222,13 +231,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // the SAME day print identical counts; different days differ by design.
     // The frozen anchors above (row counts, checksums, mv counts) never move.
     println!("\nsignals generated via generate_signals():");
-    let generated: Vec<(String, i64, i64)> =
-        sqlx::query_as("SELECT signal_type, inserted, updated FROM generate_signals()")
+    let generated: Vec<(String, i64, i64, i64)> =
+        sqlx::query_as("SELECT signal_type, inserted, updated, expired FROM generate_signals()")
             .fetch_all(&pool)
             .await?;
     let mut signals_total: i64 = 0;
-    for (signal_type, inserted, updated) in &generated {
-        println!("  {signal_type:<20}{inserted:>6} inserted  {updated:>4} updated");
+    for (signal_type, inserted, updated, expired) in &generated {
+        println!(
+            "  {signal_type:<20}{inserted:>6} inserted  {updated:>4} updated  {expired:>4} expired"
+        );
         signals_total += inserted;
     }
     println!("SIGNALS TOTAL: {signals_total} (clock-drifting: same-day reruns identical; other days differ by design)");
