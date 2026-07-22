@@ -1,7 +1,7 @@
-//! Shared plumbing for the P3 CRM routes: pagination parsing and the role
-//! gate. (The pre-existing accounts.rs / metrics.rs each carry their own copy
-//! of parse_page — that duplication is a parked P5 cleanup, deliberately left
-//! alone here; these helpers serve only the new modules.)
+//! Shared plumbing for every route module: pagination parsing and the role
+//! gate. P5 (R9b) settled the parked cleanup — accounts.rs and metrics.rs
+//! dropped their P0/P1-era local copies and read these helpers now; the
+//! grammar and 422 messages are the ones the P0/P1 test matrices pinned.
 
 use domain::UserRole;
 

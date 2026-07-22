@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT iu.id AS \"unit_id!\", iu.serial AS \"serial!\",\n                  a.id AS \"account_id!\", a.name AS \"account_name!\",\n                  t.code AS \"territory_code!\",\n                  cp.sku AS \"cartridge_sku?\"\n           FROM installed_units iu\n           JOIN sites s ON s.id = iu.site_id\n           JOIN accounts a ON a.id = s.account_id\n           JOIN territories t ON t.id = a.territory_id\n           LEFT JOIN products cp ON cp.id = iu.cartridge_product_id\n           WHERE iu.expected_changeout_months IS NULL\n             AND iu.cartridge_product_id IS NOT NULL\n           ORDER BY a.name, iu.serial",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "unit_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "serial!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "account_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "account_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "cartridge_sku?",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "22735d0f1bc85c51f9fdd23af6def2074483795a4469a4a970dbf9be884e0d99"
+}

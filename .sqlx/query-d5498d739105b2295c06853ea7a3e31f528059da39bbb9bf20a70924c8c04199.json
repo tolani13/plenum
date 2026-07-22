@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT a.id AS \"account_id!\", a.name AS \"account_name!\",\n                  t.code AS \"territory_code!\"\n           FROM accounts a\n           JOIN territories t ON t.id = a.territory_id\n           WHERE NOT EXISTS (SELECT 1 FROM sites s WHERE s.account_id = a.id)\n           ORDER BY a.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "account_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "territory_code!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d5498d739105b2295c06853ea7a3e31f528059da39bbb9bf20a70924c8c04199"
+}

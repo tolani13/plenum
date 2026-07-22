@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT rep_name AS \"rep_name!\", family AS \"family!\",\n                  SUM(gross_cents)::bigint AS \"gross_cents!\",\n                  SUM(net_cents)::bigint AS \"net_cents!\"\n           FROM v_order_facts\n           WHERE ($1::date IS NULL OR ordered_on >= $1)\n             AND ($2::date IS NULL OR ordered_on < $2)\n             AND (NOT $3::boolean\n                  OR ordered_on >= CURRENT_DATE - interval '12 months')\n             AND ($4::text = 'all' OR kind::text = $4)\n           GROUP BY rep_name, family\n           ORDER BY rep_name, family",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rep_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "family!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "net_cents!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Bool",
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "8430c144b77050ca10a9f93ac512cdb39094cddc7e9ef6bf21ecb9baca52df9a"
+}

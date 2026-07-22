@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.id AS \"territory_id!\",\n                  t.code AS \"territory_code!\",\n                  t.name AS \"territory_name!\",\n                  t.region::text AS \"region!\",\n                  COALESCE((SELECT array_agg(DISTINCT u.name)\n                            FROM territory_assignments ta\n                            JOIN users u ON u.id = ta.user_id\n                            WHERE ta.territory_id = t.id), '{}') AS \"tm_names!\",\n                  COALESCE((SELECT array_agg(DISTINCT m.name)\n                            FROM territory_assignments ta\n                            JOIN users u ON u.id = ta.user_id\n                            JOIN users m ON m.id = u.manager_id\n                            WHERE ta.territory_id = t.id), '{}') AS \"rm_names!\",\n                  COALESCE((SELECT array_agg(ts.state_code ORDER BY ts.state_code)\n                            FROM territory_states ts\n                            WHERE ts.territory_code = t.code), '{}') AS \"state_codes!\"\n           FROM territories t\n           ORDER BY t.code",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "territory_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "territory_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "region!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "tm_names!",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 5,
+        "name": "rm_names!",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 6,
+        "name": "state_codes!",
+        "type_info": "TextArray"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f498429d3ddb416f7397058c408f27f27807146cbf66d7365ae6eb9049f6909b"
+}

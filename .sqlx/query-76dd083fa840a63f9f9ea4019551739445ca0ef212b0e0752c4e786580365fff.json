@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH norm AS (\n               SELECT a.id, a.name, t.code AS territory_code,\n                      (SELECT COALESCE(string_agg(regexp_replace(w.word, 's$', ''),\n                                                  '' ORDER BY w.ord), '')\n                       FROM unnest(string_to_array(\n                                regexp_replace(lower(a.name), '[^a-z0-9 ]', '', 'g'),\n                                ' ')) WITH ORDINALITY AS w(word, ord)\n                       WHERE w.word <> ''\n                         AND w.word NOT IN ('co', 'corp', 'inc', 'llc', 'ltd',\n                                            'company', 'corporation')\n                      ) AS name_key\n               FROM accounts a\n               JOIN territories t ON t.id = a.territory_id\n           )\n           SELECT n1.name_key AS \"name_key!\",\n                  n1.id AS \"a_id!\", n1.name AS \"a_name!\",\n                  n1.territory_code AS \"a_territory_code!\",\n                  n2.id AS \"b_id!\", n2.name AS \"b_name!\",\n                  n2.territory_code AS \"b_territory_code!\"\n           FROM norm n1\n           JOIN norm n2 ON n1.name_key = n2.name_key\n                       AND n1.name_key <> ''\n                       AND (n1.name, n1.id) < (n2.name, n2.id)\n           ORDER BY n1.name_key, n1.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name_key!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "a_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "a_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "a_territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "b_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "b_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "b_territory_code!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "76dd083fa840a63f9f9ea4019551739445ca0ef212b0e0752c4e786580365fff"
+}

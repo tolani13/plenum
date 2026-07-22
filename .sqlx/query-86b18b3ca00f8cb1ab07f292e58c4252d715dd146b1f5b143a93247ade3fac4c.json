@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT signal_type AS \"signal_type!\", inserted AS \"inserted!\",\n                  updated AS \"updated!\"\n           FROM generate_signals()",
+  "query": "SELECT signal_type AS \"signal_type!\", inserted AS \"inserted!\",\n                  updated AS \"updated!\", expired AS \"expired!\"\n           FROM generate_signals()",
   "describe": {
     "columns": [
       {
@@ -17,6 +17,11 @@
         "ordinal": 2,
         "name": "updated!",
         "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "expired!",
+        "type_info": "Int8"
       }
     ],
     "parameters": {
@@ -25,8 +30,9 @@
     "nullable": [
       null,
       null,
+      null,
       null
     ]
   },
-  "hash": "bd7466ce50385cfb4b6bf462151907d1d7a0ed1ef564cc5d96d29f1af5ddc296"
+  "hash": "86b18b3ca00f8cb1ab07f292e58c4252d715dd146b1f5b143a93247ade3fac4c"
 }
