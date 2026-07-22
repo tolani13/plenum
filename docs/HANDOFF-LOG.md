@@ -246,6 +246,44 @@ One entry per build unit. Newest first.
   2026-07-21 22:21:18 -0400, on D.'s "merge". Staleness check passed (main
   still `964749f` at merge time). Repo remains local-only; branch
   p4-signals-ai kept, per precedent.
+- **Acceptance record (appended 2026-07-21 — supersedes the owed-walk line
+  above):** the 12-check walk WAS run before the merge order, in the Cowork
+  architect session, 2026-07-21 evening (ET; UTC 07-21→22): 12/12 PASS. CC
+  could not see that session, hence the honest owed-walk note, now
+  discharged. Attribution per the amended browser-drive precedent — checks
+  1–6, 8–11 Cowork-driven in D.'s browser under D.'s observation: P4-1 both
+  halves (Ridgeline defection card emergent with receipts, 338 days silent,
+  score 82,718.95 exact to formula; Draft Quote prefilled FLT-STATSAFE-GS3
+  × 32 onto the seeded win-back opp, no duplicate opp, signal actioned
+  quote_drafted:<quote id>); rep queue all-SE-1 + foreign write 404; write-
+  backs (assign chip, log-call → 360 activity + actioned, dismiss reason-
+  gated); double regenerate 0/0 all types, dismissed card never resurrected,
+  totals stable; Command rewire (rep KPI == API, VP 248 = 36/11/28/173,
+  tiles == summary, basis flip leaves counts still); P4-2 all three halves
+  (key-off library + zero error states + degraded COMPS; live ask "top 10
+  customers by net revenue in 2025" → 10 rows + chart + SQL, top row
+  Vantage Metalworks $731,372.44 cent-exact vs Leaderboards; the rep's
+  territory question returned ONE row, Southeast 1 — the generated SQL
+  carried NO territory filter, scope came from the RLS session); COMPS
+  narrative over a 9-line Ridgeline-history cohort (median 3.9%, IQR
+  3.0–4.6%) concurrent with the VP-approval policy verdict; telemetry push
+  8% on SN-GS3-00001 → regenerate → telemetry reorder card, score 71,516.16
+  = 37,248 × 1.92 exact; day-boundary regenerate showed inserted 2 /
+  updated 36+11+172, then same-day 0/0. Check 7's comps clause observed per
+  the amended R10 reading (button shows keyless, comparables-only) — the
+  unit prompt's no-button wording was Cowork's internal contradiction,
+  resolved by CC per rulings, ratified at acceptance. Check 12 in D.'s own
+  terminal: tripwire 55/55 + 3 scope PASS; reseed frozen anchors
+  byte-identical (17353/11556020473, 25497/−166812187229, 16/3367519569,
+  mv 120/195/1699/614, audit_log 17) with next-day signal counts
+  39/12/28/172 = 251 (clock-drift class, benign); API restart → queue
+  persisted (Ridgeline atop defection at 339 days, 82,963.68 exact).
+  Incidental proof: a real vendor-side failure during the walk (new console
+  org, zero credits) exercised the R8 posture live — typed 503, Ask folded
+  to the library, no screen errored. P5 additions from the walk:
+  generate_signals() ~2.1s and the enriched active-list ~1.05s tripped the
+  1s slow-statement alert (index candidates); COMPS cohort honestly empty
+  at tiny line-gross bands.
 
 ## 2026-07-19 · P3 CRM operational core
 
