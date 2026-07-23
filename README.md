@@ -2,8 +2,9 @@
 
 PLENUM is a CRM built for the installed-base business — every screen answers
 "what does the installed base owe us next?", every money figure exists as
-gross AND net, and every AI output carries its receipts. It was built as the
-audition artifact for the AI Sales & Solutions Architect role at Camfil APC:
+gross AND net, and every AI output carries its receipts. It was built as a
+reference-grade audition artifact for an AI Sales & Solutions Architect
+role in the industrial dust-collection and air-filtration space:
 synthetic data on purpose, production-shaped architecture on purpose (see
 [PRODUCTION.md](PRODUCTION.md) for the honest map from demo to deployment).
 Source of truth: [docs/plenum-crm-01.md](docs/plenum-crm-01.md) (spec v01);
@@ -21,15 +22,15 @@ Data Quality + signal auto-expiry) built on `p5-polish-map`.**
 ## Quickstart — fresh clone to running app in three commands
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM"; docker compose up -d
+cd "plenum"; docker compose up -d
 ```
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM"; cargo run --bin seed
+cd "plenum"; cargo run --bin seed
 ```
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM"; .\scripts\run-all.ps1
+cd "plenum"; .\scripts\run-all.ps1
 ```
 
 Then open **http://127.0.0.1:5177** and log in from the table below.
@@ -79,7 +80,7 @@ it is printed by the seed and lives nowhere real).
 ## Demo reset — one line
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM"; .\scripts\demo-reset.ps1
+cd "plenum"; .\scripts\demo-reset.ps1
 ```
 
 Reseeds the identical world (same anchors, same story beats), refreshes the
@@ -173,7 +174,7 @@ restored, signals regenerated). Copy the external string from the Render
 dashboard (plenum-db → Connect → External Database URL) and run:
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM"; $env:DATABASE_URL = "<EXTERNAL_DATABASE_URL>?sslmode=require"; cargo run --bin seed; $env:DATABASE_URL = $null
+cd "plenum"; $env:DATABASE_URL = "<EXTERNAL_DATABASE_URL>?sslmode=require"; cargo run --bin seed; $env:DATABASE_URL = $null
 ```
 
 Requirements for that command: your public IP must be on the database's
@@ -214,7 +215,7 @@ tripwire (70 layout checks across 14 screens × 5 widths + 5 scope
 assertions) runs with the API up:
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM\web"; npm run tripwire
+cd "plenum\web"; npm run tripwire
 ```
 
 ## Known behaviors (recorded, by design)

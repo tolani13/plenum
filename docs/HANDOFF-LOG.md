@@ -157,6 +157,12 @@ One entry per build unit. Newest first.
   cents); dev parity — run-all.ps1 unchanged, both dev ports up, serena
   RLS spot-check SE-1-only; secret grep: sk-ant absent, only empty
   ANTHROPIC_API_KEY= placeholders, .env untracked.
+- **README de-branding (D.'s order, pre-PHASE-2, 2026-07-23):** with the
+  repo now public, README.md drops the company naming — the audition frame
+  reads "an AI Sales & Solutions Architect role in the industrial
+  dust-collection and air-filtration space", and every machine-local
+  working-directory path became repo-relative (`plenum` / `plenum\web`).
+  README only; local working docs unchanged. Committed on deploy-render.
 - **Phase gate: PENDING** — live-URL acceptance (checks 1–7) after the
   GitHub grant; merge+push on D.'s literal "merge".
 
