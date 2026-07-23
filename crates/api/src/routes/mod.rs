@@ -131,9 +131,11 @@ pub fn app(state: AppState, cookie_secure: bool) -> Router {
     let router = if index_html.is_file() {
         tracing::info!(dir = %web_dist, "static tier mounted — serving the SPA for non-/api paths");
         router.fallback_service(
-            // Unknown non-API path -> index.html: the SPA router owns
-            // client-side routes like /command and /map.
-            ServeDir::new(&web_dist).not_found_service(ServeFile::new(index_html)),
+            // Unknown non-API path -> index.html WITH ITS 200 (ServeDir's
+            // `fallback` passes the inner response through untouched; its
+            // `not_found_service` would stamp 404 on deep links like
+            // /command — the SPA router owns those client-side routes).
+            ServeDir::new(&web_dist).fallback(ServeFile::new(index_html)),
         )
     } else {
         router.fallback(|| async { ApiError::NotFound })
