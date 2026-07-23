@@ -18,17 +18,27 @@ pub mod signals;
 pub mod states;
 pub mod telemetry;
 
+use std::path::PathBuf;
+
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
-use axum::routing::{get, patch, post};
+use axum::routing::{any, get, patch, post};
 use axum::Router;
+use tower_http::services::{ServeDir, ServeFile};
 use tower_sessions::cookie::time::Duration;
 use tower_sessions::cookie::SameSite;
 use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 
 use crate::error::ApiError;
 use crate::state::AppState;
+
+/// Deploy unit: GET /api/health — unauthenticated, trivial, no database
+/// touch. Render's health checker (and any uptime probe) polls it; a 200
+/// means the process is up and serving. Everything real stays behind auth.
+async fn health() -> &'static str {
+    "ok"
+}
 
 pub fn app(state: AppState, cookie_secure: bool) -> Router {
     // MemoryStore: sessions live in process memory — restart the API and
@@ -41,7 +51,8 @@ pub fn app(state: AppState, cookie_secure: bool) -> Router {
         .with_secure(cookie_secure)
         .with_expiry(Expiry::OnInactivity(Duration::hours(8)));
 
-    Router::new()
+    let router = Router::new()
+        .route("/api/health", get(health))
         .route("/api/auth/login", post(auth::login))
         .route("/api/auth/logout", post(auth::logout))
         .route("/api/auth/me", get(auth::me))
@@ -100,7 +111,35 @@ pub fn app(state: AppState, cookie_secure: bool) -> Router {
             "/api/admin/generate-signals",
             post(signals::generate_signals),
         )
-        .fallback(|| async { ApiError::NotFound })
+        // Deploy unit: unknown /api/* paths keep the P0 typed-JSON 404
+        // contract even when the SPA static tier below is mounted — the
+        // wildcard loses to every registered /api route (static segments
+        // outrank catch-alls in the matcher) and catches only the misses.
+        .route("/api", any(|| async { ApiError::NotFound }))
+        .route("/api/{*rest}", any(|| async { ApiError::NotFound }));
+
+    // Deploy unit (env-gated static tier): in the release container the API
+    // is the ONLY server, so non-/api paths serve the built SPA from disk —
+    // same origin, which is exactly why the SameSite=Lax + Secure session
+    // cookie needs no CORS story. WEB_DIST defaults to web/dist: present in
+    // the container (copied by the Dockerfile), absent from a dev/test
+    // working directory (Vite owns dev on 5177; integration tests run from
+    // crates/api) — so when index.html is missing the P0 JSON-404 fallback
+    // stands byte-for-byte and dev behavior is unchanged.
+    let web_dist = std::env::var("WEB_DIST").unwrap_or_else(|_| "web/dist".to_string());
+    let index_html = PathBuf::from(&web_dist).join("index.html");
+    let router = if index_html.is_file() {
+        tracing::info!(dir = %web_dist, "static tier mounted — serving the SPA for non-/api paths");
+        router.fallback_service(
+            // Unknown non-API path -> index.html: the SPA router owns
+            // client-side routes like /command and /map.
+            ServeDir::new(&web_dist).not_found_service(ServeFile::new(index_html)),
+        )
+    } else {
+        router.fallback(|| async { ApiError::NotFound })
+    };
+
+    router
         .layer(axum::middleware::from_fn(trace_requests))
         .layer(session_layer)
         .with_state(state)

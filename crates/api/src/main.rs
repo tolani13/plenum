@@ -55,13 +55,56 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             )
         })?;
 
-    // Fail fast, in plain language, if the schema is missing or empty.
+    // Deploy unit (env-gated; dev default = false, byte-identical behavior).
+    // On Render there is one managed database user and no initdb hook, so the
+    // API applies the embedded migrations itself on boot — idempotent, safe
+    // on every redeploy. Two consequences handled here and only here:
+    //   · the migrations GRANT to the `plenum_app` role (0007+); dev's docker
+    //     initdb creates it, a managed database does not — ensure it exists
+    //     first (NOLOGIN: nothing connects as it in prod, it only has to be
+    //     grantable);
+    //   · a freshly-migrated database has a schema but no world yet — that is
+    //     the DESIGNED state between first deploy and the one-off seed job,
+    //     so it must serve (health checks, login screen), not exit.
+    let migrate_on_boot = matches!(
+        std::env::var("MIGRATE_ON_BOOT"),
+        Ok(v) if v.trim().eq_ignore_ascii_case("true")
+    );
+    if migrate_on_boot {
+        sqlx::query(
+            "DO $$ BEGIN \
+               IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'plenum_app') THEN \
+                 CREATE ROLE plenum_app NOLOGIN; \
+               END IF; \
+             END $$;",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("could not ensure the plenum_app role exists: {e}"))?;
+        sqlx::migrate!("../../migrations").run(&pool).await?;
+        tracing::info!("migrations current (MIGRATE_ON_BOOT=true)");
+    }
+
+    // Fail fast, in plain language, if the schema is missing or empty — the
+    // dev posture. Under MIGRATE_ON_BOOT the empty world is expected until
+    // the seed job runs, so the service warns and serves instead.
     match sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users")
         .fetch_one(&pool)
         .await
     {
+        Ok(0) if migrate_on_boot => tracing::warn!(
+            "schema is current but the world is EMPTY — run the seed job \
+             (the documented one-off) to load the demo world"
+        ),
         Ok(0) => return Err("database is empty — run: cargo run --bin seed".into()),
         Ok(_) => {}
+        Err(e) if migrate_on_boot => {
+            return Err(format!(
+                "migrations ran but the schema is unreadable — check DATABASE_URL \
+                 permissions ({e})"
+            )
+            .into())
+        }
         Err(_) => {
             return Err(
                 "database not seeded — run: docker compose up -d  then  cargo run --bin seed"

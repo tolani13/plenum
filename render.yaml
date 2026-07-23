@@ -1,0 +1,66 @@
+# PLENUM on Render — the blueprint (deploy unit, D7). Source of truth for
+# the deployed topology: ONE public web service (Docker image serving the
+# Rust API under /api/* and the built SPA for everything else — one origin,
+# so the SameSite=Lax + Secure session cookie needs no CORS) and ONE managed
+# Postgres 16. Free plans on both; re-applying this blueprint recreates the
+# whole deployment.
+#
+# Secrets posture: there are none here. DATABASE_URL is wired from the
+# managed database; ANTHROPIC_API_KEY is deliberately ABSENT (AI stays off in
+# prod — D8 — and both flags are pinned false so no path even tries the
+# vendor). The demo login password is intentionally public.
+#
+# Seeding is NOT part of the deploy lifecycle (D5): a redeploy must never
+# wipe demo state. The world loads via the documented one-off seed command
+# (README "Deploy" section) run explicitly against this database.
+
+databases:
+  - name: plenum-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: plenum
+    runtime: docker
+    plan: free
+    region: oregon
+    repo: https://github.com/tolani13/plenum
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    # Deploys are explicit (dashboard / CLI / MCP trigger), never a surprise
+    # mid-demo: a deploy restarts the process and the in-memory sessions with
+    # it (D9 — accepted demo-phase posture).
+    autoDeploy: false
+    envVars:
+      # The api binary reads APP_DATABASE_URL (P0 naming); the seed binary
+      # reads DATABASE_URL. Same managed database, mapped in the blueprint
+      # rather than changing code (D7).
+      - key: APP_DATABASE_URL
+        fromDatabase:
+          name: plenum-db
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: plenum-db
+          property: connectionString
+      # HTTPS-only cookie posture (the code default, made explicit).
+      - key: COOKIE_SECURE
+        value: "true"
+      # The api applies embedded migrations on boot (idempotent) and serves
+      # an empty-but-migrated world instead of exiting (the state between
+      # first deploy and the one-off seed).
+      - key: MIGRATE_ON_BOOT
+        value: "true"
+      # AI OFF in production, provably (D8): no key exists here, and both
+      # flags are false — Ask serves the saved-question library, the COMPS
+      # button is hidden, zero vendor spend possible.
+      - key: AI_ASK_ENABLED
+        value: "false"
+      - key: AI_DISCOUNT_ENABLED
+        value: "false"
+      - key: RUST_LOG
+        value: "info"
+      # PORT is injected by Render; the entrypoint maps it to BIND_ADDR.

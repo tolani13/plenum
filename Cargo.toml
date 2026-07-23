@@ -43,3 +43,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 # regex theater. Apache-2.0. The visitor feature drives the whitelist walk
 # (every relation reference, in any clause, at any depth).
 sqlparser = { version = "0.62", features = ["visitor"] }
+# Deploy unit (pre-authorized, the ONE permitted addition): tower-http (MIT),
+# `fs` feature only — ServeDir/ServeFile so the release container serves the
+# built SPA from the same origin as /api/* (no CORS, cookies unchanged). The
+# standard axum static-serve path; mounted env-gated, dev untouched.
+tower-http = { version = "0.6", default-features = false, features = ["fs"] }

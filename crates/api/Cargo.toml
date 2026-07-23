@@ -24,6 +24,8 @@ dotenvy = { workspace = true }
 # src/ai/client.rs) and the SQL AST validator for Ask PLENUM.
 reqwest = { workspace = true }
 sqlparser = { workspace = true }
+# Deploy unit (pre-authorized): static SPA serving in the release container.
+tower-http = { workspace = true }
 
 [dev-dependencies]
 # Test-only, axum-ecosystem crates already in the dependency tree transitively:
