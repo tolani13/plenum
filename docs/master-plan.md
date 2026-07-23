@@ -54,9 +54,13 @@ Product-level plan. All phase units reference this file and the spec
 - New dependencies: NONE (zero npm, zero crates). New asset: Blank US Map
   (states only).svg — Heitordp, Wikimedia Commons, CC0 1.0 — committed
   with provenance header.
-- Status: built + internally proven; PENDING D.'s 14-check acceptance
-  walk (commands in the session report); merge pending D.'s literal
-  "merge" (pre-authorized PHASE 2).
+- Accepted + merged: D.'s literal "merge" reply 2026-07-22 (merge =
+  approval per the unit's pre-authorized PHASE 2; no in-session per-check
+  walk — the 14-check observation pass stays owed to D.'s own hands,
+  recorded in the HANDOFF-LOG entry; run it before the demo rehearsal);
+  merge commit 924da62 (--no-ff), staleness check passed. Repo remains
+  local-only; branch p5-polish-map kept. FINAL phase — the P0→P5 ladder
+  is complete.
 
 ## 2026-07-20 — P4 Signals + AI: built, merged 2026-07-21
 - Shipped surface: signals become REAL — four deterministic generators
@@ -248,8 +252,9 @@ Product-level plan. All phase units reference this file and the spec
   evening (HANDOFF-LOG record, 8bfe7c7).
 - P5 Polish + demo hardening + Territory Map — DONE (this entry): map +
   leakage screen + data-quality panel + signal auto-expiry + perf/bundle/
-  states pass + quickstart scripts + PRODUCTION.md + tripwire 70+5. Built
-  on p5-polish-map; pending D.'s 14-check acceptance walk + "merge".
+  states pass + quickstart scripts + PRODUCTION.md + tripwire 70+5.
+  Merged 924da62 on D.'s "merge" 2026-07-22; the 14-check observation
+  walk stays owed to D.'s hands. LADDER COMPLETE.
 
 ## Standing constraints (spec §4/§7 shortlist)
 BIGINT cents · timestamptz · RLS in Postgres never app code · typed
@@ -274,4 +279,5 @@ report by walking acceptance checks, never internal tests alone.
   same evening, 12/12 PASS (acceptance record 8bfe7c7).
 - 2026-07-22 — P5 built on p5-polish-map (migration 0013, Territory Map +
   Leakage + Data Quality, auto-expiry, perf/bundle, scripts + PRODUCTION.md
-  + README, tripwire 70+5). Pending D.'s walk + merge.
+  + README, tripwire 70+5) and merged 924da62 on D.'s "merge" the same day
+  (14-check observation walk owed). The P0→P5 ladder is complete.

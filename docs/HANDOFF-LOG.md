@@ -217,12 +217,28 @@ One entry per build unit. Newest first.
   CC0 1.0 Universal Public Domain Dedication) committed with a provenance
   header + license note in README; derived usStates.ts carries the same
   attribution.
-- **Phase gate: PENDING** — D.'s 14-check acceptance walk (commands
-  supplied single-line in the session report). Build reported complete on
-  internal proof only; the gate is D.'s hands + eyes.
+- **Phase gate: P5 ACCEPTED** — D.'s literal "merge" reply, 2026-07-22
+  (merge = approval per this unit's pre-authorized PHASE 2 protocol, the
+  P1/P4 precedent). Attribution for the record: no per-check acceptance
+  walk was run in-session before the order — the gate rests on the merge
+  order plus the build evidence in this entry (check.sh 60/60, two
+  byte-identical seed runs post-0013, the SHA-proven R1 equivalence,
+  tripwire 70/70 + 5 scope, the fresh-clone 3-command login proof, and the
+  browser-driven internal walk of the map panel / leakage chips / DQ trio /
+  new-account 422). The 14-check walk in the session report remains OWED
+  as D.'s own observation pass (the checks that write data plus the
+  terminal checks: auto-expiry serials, tripwire, fresh clone, reseed, the
+  real tablet) — run it before the demo rehearsal; any failure reopens the
+  gate.
 - **Commit:** built across `p5-polish-map` (`e8e88aa` schema+seed →
-  `3766d7d` API → `5b64c02` tests → web/tripwire → scripts+docs; final
-  list in the session report).
+  `3766d7d` API → `5b64c02` tests → `164c6fe` web+tripwire → `ebdd622`
+  scripts+docs; this acceptance/merge record added in the closeout commit
+  on main).
+- **Merge record:** `924da62` — p5-polish-map merged to main (--no-ff),
+  2026-07-22 20:22:33 -0400, on D.'s "merge". Staleness check passed (main
+  still `8bfe7c7` at merge time). Repo remains local-only; branch
+  p5-polish-map kept, per precedent. FINAL phase: the P0→P5 ladder is
+  complete.
 
 ## 2026-07-20 · P4 Signals + AI
 

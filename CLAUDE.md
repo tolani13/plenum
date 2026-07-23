@@ -6,10 +6,12 @@ P2 Command+Leaderboards UI merged to main de0be08 2026-07-19 on D.'s "merge".
 P3 CRM core merged to main c8936ec 2026-07-20 on D.'s "merge" (11/11 PASS).
 P4 Signals+AI merged to main 56cdd9b 2026-07-21 on D.'s "merge"; the
 12-check walk ran the same evening, 12/12 PASS (acceptance record 8bfe7c7).
-P5 (FINAL) built on p5-polish-map 2026-07-22 — pending D.'s 14-check
-acceptance walk and literal "merge" (pre-authorized PHASE 2). Phase gate:
-D.'s explicit pass on the prior phase's acceptance checks — never start a
-phase without it.
+P5 (FINAL) merged to main 924da62 2026-07-22 on D.'s "merge" (per the
+unit's pre-authorized PHASE 2; the 14-check observation walk stays OWED to
+D.'s own hands — run it before the demo rehearsal). The P0→P5 ladder is
+COMPLETE; any further work is a new unit from a fresh Cowork session, not
+a phase. Phase gate discipline stands for any such unit: D.'s explicit
+pass, never assumed.
 Non-negotiables: RLS in Postgres (API connects ONLY as plenum_app; admin conn is
 seed/migrations only) · money = BIGINT cents · typed errors 401/403/404/422, empty
 result ≠ error · pagination max 200 · no secrets in repo or client · sqlx
