@@ -165,13 +165,25 @@ exists in prod** — AI is off, provably: Ask serves the saved-question
 library, the COMPS button hides, zero vendor spend is possible.
 
 **Seed / production reset** (explicitly, never on deploy — a redeploy never
-wipes demo state). One line, runs the seed inside the service's image with
-its env (TRUNCATE + regenerate: every frozen anchor restored, signals
-regenerated):
+wipes demo state). Render one-off jobs need a **paid** instance plan
+("free tier plans are not supported for jobs"), so on the free plan the
+reset runs the seed binary locally against the database's EXTERNAL
+connection string over TLS (TRUNCATE + regenerate: every frozen anchor
+restored, signals regenerated). Copy the external string from the Render
+dashboard (plenum-db → Connect → External Database URL) and run:
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM"; render jobs create <SERVICE_ID> --start-command "/app/seed" -o json --confirm
+cd "C:\AI_Projects\Camfil CRM"; $env:DATABASE_URL = "<EXTERNAL_DATABASE_URL>?sslmode=require"; cargo run --bin seed; $env:DATABASE_URL = $null
 ```
+
+Requirements for that command: your public IP must be on the database's
+**Access Control allowlist** (dashboard → plenum-db → Access Control; the
+deploy added `74.124.184.78/32`, this machine), and `?sslmode=require`
+stays on the URL. On a paid instance type the job form works instead:
+`render jobs create srv-d9goii4vikkc739qverg --start-command "/app/seed"`.
+Note: the seed detects a non-superuser (managed) connection and pins the
+seeded admin's identity for its session — managed owners are subject to
+the FORCEd RLS by design; local superuser runs are unchanged.
 
 **Who can see this (privacy posture, stated honestly):** there is no email
 gate. The link's privacy is the unguessable `onrender.com` URL plus the demo
