@@ -163,8 +163,20 @@ One entry per build unit. Newest first.
   dust-collection and air-filtration space", and every machine-local
   working-directory path became repo-relative (`plenum` / `plenum\web`).
   README only; local working docs unchanged. Committed on deploy-render.
-- **Phase gate: PENDING** — live-URL acceptance (checks 1–7) after the
-  GitHub grant; merge+push on D.'s literal "merge".
+- **Phase gate: DEPLOY ACCEPTED** — D.'s literal "merge" reply, 2026-07-23
+  (merge = approval per this unit's pre-authorized PHASE 2 protocol).
+  Attribution for the record: the live-URL checks 1–7 were proven
+  programmatically in-session (anchors, RLS scope, AI-off, persistence,
+  reset — outputs in the session report); D.'s own eyes on the live URL
+  remain OWED, and the P5 14-check walk still stands owed and still gates
+  sending the link onward.
+- **Merge record:** `2e67b23` — deploy-render merged to main (--no-ff),
+  2026-07-22 23:45:32 -0400 (machine clock; D.'s order dated 2026-07-23),
+  on D.'s "merge". Staleness check passed (local main AND origin/main both
+  still `1a37189`). Pushed: origin/main + origin/deploy-render (the
+  sanctioned exception — D. wired the remote for deployment). Live service
+  flipped from branch deploy-render to MAIN per the blueprint and
+  redeployed. Branch deploy-render kept, per precedent.
 
 ## 2026-07-22 · P5 Polish + demo hardening + Territory Map (FINAL phase)
 

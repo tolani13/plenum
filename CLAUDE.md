@@ -91,6 +91,9 @@ PURPOSE — they are demo script material, not bugs to fix.
 Discipline: no-proof-no-run — report phases by walking acceptance checks, stating
 what D. will observe; never report done on internal tests alone.
 History: §14 devil's-case gate waived by D. 2026-07-17 (execute order = lock/go).
+Deploy merged to main 2e67b23 2026-07-23 on D.'s "merge"; live service
+tracks MAIN per the blueprint (README de-branded for the public repo the
+same day, D.'s order).
 Deploy (2026-07-22, branch deploy-render): repo now has origin =
 github.com/tolani13/plenum (private) — the ONE sanctioned remote; pushes
 only per deploy-unit protocol. Prod artifacts: Dockerfile (3-stage: SPA →
