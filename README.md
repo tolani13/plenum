@@ -141,6 +141,55 @@ runtime fetches):
   (migration 0013), seeded along US Census division lines; Canada renders as
   two schematic blocks (CA-E / CA-W — province detail out of scope).
 
+## Deploy (Render)
+
+The live demo runs the PRODUCTION.md conversion on Render: **one public web
+service** (a Docker image serving the Rust API under `/api/*` and the built
+SPA for everything else — one origin, so the `SameSite=Lax` + `Secure`
+session cookie needs no CORS) and **one managed Postgres 16**. Both on free
+plans. [render.yaml](render.yaml) is the blueprint; the same topology can be
+recreated by re-applying it (Render dashboard → New → Blueprint) or by the
+Render CLI/API following it.
+
+**Provisioned resources:** database `plenum-db` (free, oregon, PG16) ·
+web service `plenum` (free, oregon, Docker, health check `/api/health`,
+`autoDeploy` off — deploys are explicit).
+
+**Env vars on the service** (no secrets in the repo or image — everything
+arrives here): `APP_DATABASE_URL` + `DATABASE_URL` (the managed database's
+internal connection string), `COOKIE_SECURE=true`, `MIGRATE_ON_BOOT=true`
+(the API applies embedded migrations on boot — idempotent — and serves an
+empty-but-migrated world instead of exiting), `AI_ASK_ENABLED=false`,
+`AI_DISCOUNT_ENABLED=false`, `RUST_LOG=info`. **No `ANTHROPIC_API_KEY`
+exists in prod** — AI is off, provably: Ask serves the saved-question
+library, the COMPS button hides, zero vendor spend is possible.
+
+**Seed / production reset** (explicitly, never on deploy — a redeploy never
+wipes demo state). One line, runs the seed inside the service's image with
+its env (TRUNCATE + regenerate: every frozen anchor restored, signals
+regenerated):
+
+```powershell
+cd "C:\AI_Projects\Camfil CRM"; render jobs create <SERVICE_ID> --start-command "/app/seed" -o json --confirm
+```
+
+**Who can see this (privacy posture, stated honestly):** there is no email
+gate. The link's privacy is the unguessable `onrender.com` URL plus the demo
+login; every row of data is synthetic. A hard gate (edge auth / custom
+domain behind an access proxy) is a later add if wanted.
+
+**Known behaviors on the free plan:**
+
+- The service **spins down when idle**; the first hit afterward cold-starts
+  (tens of seconds). By design of the free plan.
+- Sessions are in-memory (accepted demo posture): a **redeploy or
+  spin-down signs everyone out** — log back in.
+- After a redeploy, a browser holding the old page may fetch a stale hashed
+  chunk and get the SPA shell instead; a reload fixes it.
+- **Render's free Postgres expires after 30 days** unless upgraded — the
+  database (and the demo data) is deleted then. Re-applying the blueprint +
+  one seed job restores everything, deterministically.
+
 ## Development
 
 ```

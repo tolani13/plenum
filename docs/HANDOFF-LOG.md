@@ -4,6 +4,111 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-22 · Deploy: PLENUM on Render (all-Render, one origin)
+
+- **Unit:** production deploy (one Render web service serving API + SPA,
+  one managed Render Postgres, seeded deterministic world, AI OFF, RLS over
+  the wire) — branch `deploy-render` from main `1a37189`. Tier 3. FIRST
+  unit with a remote: origin = github.com/tolani13/plenum (private).
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+- **Architect rulings recorded (D1–D10, dispositions inline):**
+  - **D1 — Multi-stage Dockerfile** (repo root, prod-only): node:20-slim
+    builds the SPA from the committed lockfile (npm ci);
+    rust:1.95-bookworm (the repo's pinned toolchain) builds `api` + `seed`
+    release binaries with SQLX_OFFLINE=true; debian:bookworm-slim runtime
+    (+ca-certificates, non-root user `plenum`) carries the two binaries,
+    migrations/ (transparency — both binaries embed them), web/dist, and
+    the entrypoint. .dockerignore keeps the context lean and secret-free.
+    No .env, no key, no password in any layer.
+  - **D2 — Render port binding.** docker/entrypoint.sh exports
+    BIND_ADDR=0.0.0.0:${PORT:-10000} and execs /app/api (PID 1). Graceful
+    shutdown CONFIRMED as-is for dev (ctrl-c); honest note: the handler
+    listens for SIGINT only, so Render's SIGTERM stop is abrupt —
+    consequence-free here (sessions are in-memory and lost on restart by
+    design; requests are short) and adding a SIGTERM arm was outside the
+    three sanctioned code touches. Recorded, not built.
+  - **D3 — SPA from axum** (sanctioned touch a). tower-http ServeDir
+    mounted as the router's fallback_service, gated on
+    WEB_DIST/index.html existing (default web/dist: present in the
+    container, absent from dev/test working directories — dev and the
+    test-suite JSON-404 behavior stay byte-identical). Unknown /api/*
+    paths keep the typed JSON 404 contract via an /api catch-all that
+    outranks the static tier. Deep links serve index.html WITH 200
+    (ServeDir::fallback — its not_found_service variant stamps 404; found
+    by the container smoke test and fixed). Known blanket-SPA tradeoff,
+    recorded: a missing /assets/* path also serves index with 200 (stale
+    post-redeploy chunks recover on reload).
+  - **D4 — Migrations on boot** (sanctioned touch b), env-gated
+    MIGRATE_ON_BOOT=true (constraint 4's env-gate law; dev default false =
+    byte-identical). Two prod realities folded into the same touch,
+    disclosed: (i) migrations 0007+ GRANT to `plenum_app`, which managed
+    Postgres doesn't have — the gated path ensures the role exists first
+    (CREATE ROLE plenum_app NOLOGIN if absent; nothing connects as it in
+    prod, it only has to be grantable); (ii) the P0 fail-fast exits on an
+    empty users table, which would crash-loop the service between first
+    deploy and the seed job — under the gate it WARNS and serves instead
+    (health checks + login screen live; data arrives with the job).
+    Rehearsed against a scratch DB from the image: migrate → EMPTY warn →
+    health 200 → seed job → ledger anchor exact.
+  - **D5 — Seed as an explicit one-off job, never in the deploy
+    lifecycle.** The image ships /app/seed; the documented reset is
+    `render jobs create <SERVICE_ID> --start-command "/app/seed"` (runs in
+    the service's image + env). Redeploys never touch data.
+  - **D6 — /api/health** (sanctioned touch c): unauthenticated 200 "ok",
+    no DB touch; the Render service health check points at it.
+  - **D7 — render.yaml blueprint** at the repo root describes the whole
+    topology (free Postgres 16 `plenum-db` + free Docker web service
+    `plenum`, oregon, healthCheckPath, autoDeploy off, env wiring).
+    The api reads APP_DATABASE_URL and the seed reads DATABASE_URL — both
+    mapped from the same database in the blueprint, no code change.
+    `render blueprints validate` passes modulo the repo-visibility item
+    below.
+  - **D8 — AI OFF in prod, provably.** No ANTHROPIC_API_KEY exists on the
+    service; AI_ASK_ENABLED=false and AI_DISCOUNT_ENABLED=false pinned.
+    Zero vendor spend possible from the live site.
+  - **D9 — MemoryStore stays** (accepted): redeploy/idle spin-down signs
+    everyone out; free-plan cold starts are tens of seconds. Documented in
+    README "Deploy" known behaviors, plus the free-Postgres 30-day expiry.
+  - **D10 — Privacy posture stated, not solved:** unguessable onrender.com
+    URL + demo login + 100% synthetic data; hard gate is a later add.
+    Documented in README verbatim ("who can see this").
+  - **Test maintenance, disclosed:** the P5 policy-parity test assumed the
+    signals census was generated the same UTC day as the request; the
+    window slid at midnight mid-unit and it tripped. Fixed clock-honest
+    (feed == in-window census; leftovers exactly the out-of-window rows
+    pending expiry). App behavior untouched.
+- **New dependency (the ONE permitted):** tower-http 0.6 (MIT),
+  `fs` feature only — ServeDir/ServeFile for the static tier. Nothing else
+  added (npm zero, crates zero beyond it).
+- **Provisioning record (free plans only — nothing that bills):**
+  - Auth path: the Render MCP token on this machine was unauthorized; the
+    authenticated surface is the Render CLI v2.15.1 (workspace "Dilip's
+    workspace", tea-d5ufur7fte5s73eaj0e0) and its stored API key against
+    the public REST API (used for creation calls the CLI lacks; the key
+    never left the machine, never printed, never committed).
+  - CREATED: Postgres `plenum-db` — dpg-d9go6b3bc2fs738vcm00-a, plan
+    free, region oregon, version 16, status available.
+  - Web service `plenum`: creation BLOCKED at first attempt — the repo is
+    private and the Render workspace has no GitHub App grant for
+    tolani13/plenum ("repository … invalid or unfetchable"), which no API
+    can create (OAuth consent only D. can give). The branch push needed
+    for the build (deploy-render → origin, pre-merge) was done and
+    disclosed — main untouched until PHASE 2.
+  - <PENDING at go: service id, live URL, first deploy, seed job run,
+    live-anchor proof — recorded here once the GitHub grant exists.>
+- **Verification (local, all output in the session report):** check.sh ALL
+  CHECKS PASSED (60 tests incl. the clock-honest fix); docker build clean;
+  container smoke — health 200, SPA 200 on /, /command, /map, typed JSON
+  404 on unknown /api/*, VP login + 48 accounts through the container;
+  first-boot rehearsal on a scratch DB (created + dropped by the
+  rehearsal): migrations, EMPTY-world warn, health 200, then the seed FROM
+  THE IMAGE loading the world to the exact ledger anchor (2467089087
+  cents); dev parity — run-all.ps1 unchanged, both dev ports up, serena
+  RLS spot-check SE-1-only; secret grep: sk-ant absent, only empty
+  ANTHROPIC_API_KEY= placeholders, .env untracked.
+- **Phase gate: PENDING** — live-URL acceptance (checks 1–7) after the
+  GitHub grant; merge+push on D.'s literal "merge".
+
 ## 2026-07-22 · P5 Polish + demo hardening + Territory Map (FINAL phase)
 
 - **Unit:** P5 (Territory Map screen over a committed public-domain SVG,

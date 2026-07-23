@@ -37,6 +37,17 @@ deployment.
 5. Operations: TLS termination, scheduled rollup refresh + signal
    generation, backups, log shipping, secret manager.
 
+## Live demo (the executed conversion)
+
+The deploy unit (2026-07-22) executed this page's swaps as far as the demo
+needs them: the committed [render.yaml](render.yaml) blueprint runs the app
+as one Render web service (Docker: API + SPA, one origin) over a managed
+Render Postgres, migrations applied by the API on boot, the deterministic
+seed run as an explicit one-off job (the production "reset" button), AI off
+with no key deployed, RLS enforced over the wire. Data-in is still the seed
+at its marked importer seam — the ERP-extract loader remains the go-live
+swap, exactly as below.
+
 ## Realistic sequence
 
 Phase 1 — data-mapping workshop + extract loader against a copy of the
