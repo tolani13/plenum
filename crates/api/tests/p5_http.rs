@@ -409,9 +409,17 @@ async fn leakage_sigma_equivalence_policy_parity_and_heat() {
         );
     }
 
-    // 2 · POLICY PARITY: outliers=policy rows are exactly the rows the
-    // discount_anomaly generator flags — every row carries its signal chip,
-    // and (while the census fits one page) the sets are equal.
+    // 2 · POLICY PARITY, clock-honest form: the feed runs the generator's
+    // math LIVE, while the signals table holds whatever the LAST generation
+    // run produced — and the trailing window slides at the UTC midnight
+    // tick, so a signal whose order line just fell out of the window can
+    // linger until the next run expires it (the documented clock-drift
+    // class; first observed live when this suite crossed a date boundary).
+    // The day-proof assertions:
+    //   · every policy-mode outlier row carries its signal chip;
+    //   · the feed set == the census restricted to IN-window lines;
+    //   · every census row the feed lacks is explainably OUT of the window
+    //     (pending expiry on the next generation run) — nothing else.
     let (s, policy_page) = send(
         &app,
         "GET",
@@ -433,47 +441,53 @@ async fn leakage_sigma_equivalence_policy_parity_and_heat() {
             "a policy-mode outlier without its signal chip: {r}"
         );
     }
-    let mut signal_lines: Vec<String> = sqlx::query_scalar::<_, String>(
-        "SELECT replace(dedupe_key, 'discount_anomaly:', '')
-         FROM signals WHERE type = 'discount_anomaly'",
-    )
-    .fetch_all(&pool)
-    .await
-    .expect(
-        "signal keys (RLS off the table for counting? no — plenum_app under no GUC sees nothing)",
-    )
-    .into_iter()
-    .collect();
-    // plenum_app with NO GUC reads zero rows (fail-closed) — fetch under the
-    // VP GUC instead.
-    if signal_lines.is_empty() {
-        let mut tx = pool.begin().await.expect("tx");
-        sqlx::query(
-            "SELECT set_config('app.user_id', $1, true), set_config('app.role', 'vp', true)",
-        )
+    // Census with in-window flags, under the VP GUC (plenum_app with no GUC
+    // reads zero rows — fail-closed).
+    let mut tx = pool.begin().await.expect("tx");
+    sqlx::query("SELECT set_config('app.user_id', $1, true), set_config('app.role', 'vp', true)")
         .bind(&vp_id)
         .execute(&mut *tx)
         .await
         .expect("GUC");
-        signal_lines = sqlx::query_scalar::<_, String>(
-            "SELECT replace(dedupe_key, 'discount_anomaly:', '')
-             FROM signals WHERE type = 'discount_anomaly'",
-        )
-        .fetch_all(&mut *tx)
-        .await
-        .expect("signal keys under GUC");
-        tx.rollback().await.ok();
-    }
-    if signal_lines.len() <= 200 {
+    let census = sqlx::query(
+        "SELECT replace(s.dedupe_key, 'discount_anomaly:', '') AS line_id,
+                (o.ordered_on >= CURRENT_DATE - sp.discount_window_days) AS in_window
+         FROM signals s
+         JOIN order_lines ol ON ol.id = s.order_line_id
+         JOIN orders o ON o.id = ol.order_id
+         CROSS JOIN signal_policy sp
+         WHERE s.type = 'discount_anomaly'",
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .expect("census under GUC");
+    tx.rollback().await.ok();
+
+    let mut in_window: Vec<String> = census
+        .iter()
+        .filter(|r| r.get::<bool, _>("in_window"))
+        .map(|r| r.get::<String, _>("line_id"))
+        .collect();
+    let stale: Vec<String> = census
+        .iter()
+        .filter(|r| !r.get::<bool, _>("in_window"))
+        .map(|r| r.get::<String, _>("line_id"))
+        .collect();
+    if in_window.len() <= 200 {
         policy_lines.sort();
-        signal_lines.sort();
+        in_window.sort();
         assert_eq!(
-            policy_lines, signal_lines,
-            "policy outliers == the generator's census"
+            policy_lines, in_window,
+            "policy outliers == the in-window generator census"
         );
     } else {
         assert_eq!(policy_lines.len(), 200, "page cap");
     }
+    assert_eq!(
+        census.len() - in_window.len().min(census.len()),
+        stale.len(),
+        "every census row the feed lacks is out-of-window (pending expiry)"
+    );
 
     // 3 · HEAT: present, dual-cents, and the demo beat — Wes Turner's row is
     // the worst leakage_pct on the VP's cumulative table.

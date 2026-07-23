@@ -2,8 +2,9 @@
 
 PLENUM is a CRM built for the installed-base business — every screen answers
 "what does the installed base owe us next?", every money figure exists as
-gross AND net, and every AI output carries its receipts. It was built as the
-audition artifact for the AI Sales & Solutions Architect role at Camfil APC:
+gross AND net, and every AI output carries its receipts. It was built as a
+reference-grade audition artifact for an AI Sales & Solutions Architect
+role in the industrial dust-collection and air-filtration space:
 synthetic data on purpose, production-shaped architecture on purpose (see
 [PRODUCTION.md](PRODUCTION.md) for the honest map from demo to deployment).
 Source of truth: [docs/plenum-crm-01.md](docs/plenum-crm-01.md) (spec v01);
@@ -21,15 +22,15 @@ Data Quality + signal auto-expiry) built on `p5-polish-map`.**
 ## Quickstart — fresh clone to running app in three commands
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM"; docker compose up -d
+cd "plenum"; docker compose up -d
 ```
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM"; cargo run --bin seed
+cd "plenum"; cargo run --bin seed
 ```
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM"; .\scripts\run-all.ps1
+cd "plenum"; .\scripts\run-all.ps1
 ```
 
 Then open **http://127.0.0.1:5177** and log in from the table below.
@@ -79,7 +80,7 @@ it is printed by the seed and lives nowhere real).
 ## Demo reset — one line
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM"; .\scripts\demo-reset.ps1
+cd "plenum"; .\scripts\demo-reset.ps1
 ```
 
 Reseeds the identical world (same anchors, same story beats), refreshes the
@@ -141,6 +142,67 @@ runtime fetches):
   (migration 0013), seeded along US Census division lines; Canada renders as
   two schematic blocks (CA-E / CA-W — province detail out of scope).
 
+## Deploy (Render)
+
+The live demo runs the PRODUCTION.md conversion on Render: **one public web
+service** (a Docker image serving the Rust API under `/api/*` and the built
+SPA for everything else — one origin, so the `SameSite=Lax` + `Secure`
+session cookie needs no CORS) and **one managed Postgres 16**. Both on free
+plans. [render.yaml](render.yaml) is the blueprint; the same topology can be
+recreated by re-applying it (Render dashboard → New → Blueprint) or by the
+Render CLI/API following it.
+
+**Provisioned resources:** database `plenum-db` (free, oregon, PG16) ·
+web service `plenum` (free, oregon, Docker, health check `/api/health`,
+`autoDeploy` off — deploys are explicit).
+
+**Env vars on the service** (no secrets in the repo or image — everything
+arrives here): `APP_DATABASE_URL` + `DATABASE_URL` (the managed database's
+internal connection string), `COOKIE_SECURE=true`, `MIGRATE_ON_BOOT=true`
+(the API applies embedded migrations on boot — idempotent — and serves an
+empty-but-migrated world instead of exiting), `AI_ASK_ENABLED=false`,
+`AI_DISCOUNT_ENABLED=false`, `RUST_LOG=info`. **No `ANTHROPIC_API_KEY`
+exists in prod** — AI is off, provably: Ask serves the saved-question
+library, the COMPS button hides, zero vendor spend is possible.
+
+**Seed / production reset** (explicitly, never on deploy — a redeploy never
+wipes demo state). Render one-off jobs need a **paid** instance plan
+("free tier plans are not supported for jobs"), so on the free plan the
+reset runs the seed binary locally against the database's EXTERNAL
+connection string over TLS (TRUNCATE + regenerate: every frozen anchor
+restored, signals regenerated). Copy the external string from the Render
+dashboard (plenum-db → Connect → External Database URL) and run:
+
+```powershell
+cd "plenum"; $env:DATABASE_URL = "<EXTERNAL_DATABASE_URL>?sslmode=require"; cargo run --bin seed; $env:DATABASE_URL = $null
+```
+
+Requirements for that command: your public IP must be on the database's
+**Access Control allowlist** (dashboard → plenum-db → Access Control; the
+deploy added `74.124.184.78/32`, this machine), and `?sslmode=require`
+stays on the URL. On a paid instance type the job form works instead:
+`render jobs create srv-d9goii4vikkc739qverg --start-command "/app/seed"`.
+Note: the seed detects a non-superuser (managed) connection and pins the
+seeded admin's identity for its session — managed owners are subject to
+the FORCEd RLS by design; local superuser runs are unchanged.
+
+**Who can see this (privacy posture, stated honestly):** there is no email
+gate. The link's privacy is the unguessable `onrender.com` URL plus the demo
+login; every row of data is synthetic. A hard gate (edge auth / custom
+domain behind an access proxy) is a later add if wanted.
+
+**Known behaviors on the free plan:**
+
+- The service **spins down when idle**; the first hit afterward cold-starts
+  (tens of seconds). By design of the free plan.
+- Sessions are in-memory (accepted demo posture): a **redeploy or
+  spin-down signs everyone out** — log back in.
+- After a redeploy, a browser holding the old page may fetch a stale hashed
+  chunk and get the SPA shell instead; a reload fixes it.
+- **Render's free Postgres expires after 30 days** unless upgraded — the
+  database (and the demo data) is deleted then. Re-applying the blueprint +
+  one seed job restores everything, deterministically.
+
 ## Development
 
 ```
@@ -153,7 +215,7 @@ tripwire (70 layout checks across 14 screens × 5 widths + 5 scope
 assertions) runs with the API up:
 
 ```powershell
-cd "C:\AI_Projects\Camfil CRM\web"; npm run tripwire
+cd "plenum\web"; npm run tripwire
 ```
 
 ## Known behaviors (recorded, by design)

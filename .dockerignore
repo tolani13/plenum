@@ -1,0 +1,15 @@
+# Deploy unit: keep the build context lean and secret-free. The image is
+# built FROM source; nothing pre-built or environment-local goes in.
+.git/
+.env
+target/
+web/node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
+dist/
+docs/
+*.md
+!README.md
+.claude/
+scripts/

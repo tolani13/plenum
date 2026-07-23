@@ -119,8 +119,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| DEFAULT_ADMIN_URL.to_string());
 
     println!("PLENUM seed — deterministic engine (seed {})", util::SEED);
+    // ONE connection, deliberately (deploy unit): the writes are a single
+    // transaction and the derivation calls are sequential, so extra
+    // connections buy nothing — and the managed-database identity below is a
+    // per-connection session setting that must cover every later statement.
     let pool = PgPoolOptions::new()
-        .max_connections(4)
+        .max_connections(1)
         .connect(&url)
         .await
         .map_err(|e| {
@@ -137,6 +141,33 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     print!("generating world in memory... ");
     let world = generate_world();
     println!("ok");
+
+    // Deploy unit — managed-database parity. Local dev seeds as the
+    // plenum_admin SUPERUSER, which bypasses RLS entirely (and leaves seed
+    // audit rows with a NULL actor — the recorded P0 semantics). A managed
+    // database's user is the table OWNER but NOT superuser, and 0005 FORCEs
+    // RLS onto owners too — so without an identity every world INSERT dies
+    // on WITH CHECK. On non-superuser connections only, pin the seeded
+    // ADMIN's identity for this session (admin scope = every territory, the
+    // same identity the API's admin surface uses); superuser dev runs skip
+    // this branch and stay byte-identical, NULL audit actor included.
+    let is_superuser: String = sqlx::query_scalar("SELECT current_setting('is_superuser')")
+        .fetch_one(&pool)
+        .await?;
+    if is_superuser != "on" {
+        let admin = world
+            .users
+            .iter()
+            .find(|u| u.role == UserRole::Admin)
+            .expect("seed world has an admin");
+        sqlx::query(
+            "SELECT set_config('app.user_id', $1, false), set_config('app.role', 'admin', false)",
+        )
+        .bind(admin.id.to_string())
+        .execute(&pool)
+        .await?;
+        println!("non-superuser connection — RLS identity pinned to the seeded admin");
+    }
 
     // ════════════ DB LOAD (R12 seam marker) ════════════════════════════════
     // From here down is the LOADER side: write the World, then derive

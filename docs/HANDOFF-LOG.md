@@ -4,6 +4,168 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-22 · Deploy: PLENUM on Render (all-Render, one origin)
+
+- **Unit:** production deploy (one Render web service serving API + SPA,
+  one managed Render Postgres, seeded deterministic world, AI OFF, RLS over
+  the wire) — branch `deploy-render` from main `1a37189`. Tier 3. FIRST
+  unit with a remote: origin = github.com/tolani13/plenum (private).
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+- **Architect rulings recorded (D1–D10, dispositions inline):**
+  - **D1 — Multi-stage Dockerfile** (repo root, prod-only): node:20-slim
+    builds the SPA from the committed lockfile (npm ci);
+    rust:1.95-bookworm (the repo's pinned toolchain) builds `api` + `seed`
+    release binaries with SQLX_OFFLINE=true; debian:bookworm-slim runtime
+    (+ca-certificates, non-root user `plenum`) carries the two binaries,
+    migrations/ (transparency — both binaries embed them), web/dist, and
+    the entrypoint. .dockerignore keeps the context lean and secret-free.
+    No .env, no key, no password in any layer.
+  - **D2 — Render port binding.** docker/entrypoint.sh exports
+    BIND_ADDR=0.0.0.0:${PORT:-10000} and execs /app/api (PID 1). Graceful
+    shutdown CONFIRMED as-is for dev (ctrl-c); honest note: the handler
+    listens for SIGINT only, so Render's SIGTERM stop is abrupt —
+    consequence-free here (sessions are in-memory and lost on restart by
+    design; requests are short) and adding a SIGTERM arm was outside the
+    three sanctioned code touches. Recorded, not built.
+  - **D3 — SPA from axum** (sanctioned touch a). tower-http ServeDir
+    mounted as the router's fallback_service, gated on
+    WEB_DIST/index.html existing (default web/dist: present in the
+    container, absent from dev/test working directories — dev and the
+    test-suite JSON-404 behavior stay byte-identical). Unknown /api/*
+    paths keep the typed JSON 404 contract via an /api catch-all that
+    outranks the static tier. Deep links serve index.html WITH 200
+    (ServeDir::fallback — its not_found_service variant stamps 404; found
+    by the container smoke test and fixed). Known blanket-SPA tradeoff,
+    recorded: a missing /assets/* path also serves index with 200 (stale
+    post-redeploy chunks recover on reload).
+  - **D4 — Migrations on boot** (sanctioned touch b), env-gated
+    MIGRATE_ON_BOOT=true (constraint 4's env-gate law; dev default false =
+    byte-identical). Two prod realities folded into the same touch,
+    disclosed: (i) migrations 0007+ GRANT to `plenum_app`, which managed
+    Postgres doesn't have — the gated path ensures the role exists first
+    (CREATE ROLE plenum_app NOLOGIN if absent; nothing connects as it in
+    prod, it only has to be grantable); (ii) the P0 fail-fast exits on an
+    empty users table, which would crash-loop the service between first
+    deploy and the seed job — under the gate it WARNS and serves instead
+    (health checks + login screen live; data arrives with the job).
+    Rehearsed against a scratch DB from the image: migrate → EMPTY warn →
+    health 200 → seed job → ledger anchor exact.
+  - **D5 — Seed as an explicit one-off, never in the deploy lifecycle.**
+    The image ships /app/seed. The ruling's first-preference form —
+    `render jobs create <SERVICE_ID> --start-command "/app/seed"` — was
+    attempted and REFUSED by the platform on the free plan (400: "free
+    tier plans are not supported for jobs"); it remains the documented
+    path if the service ever moves to a paid instance. The executed
+    fallback (anticipated in the ruling's "whichever is available"): run
+    the seed binary locally against the database's EXTERNAL connection
+    string over TLS (?sslmode=require) — which surfaced and settled two
+    managed-database realities, both disclosed:
+      (i) external access needs an Access Control entry — added
+          74.124.184.78/32 ("D. dev machine (seed/reset) 2026-07-23"),
+          the tightest useful rule; resets from another network mean
+          adding that network's IP in the dashboard first;
+      (ii) the managed user is the table OWNER but NOT superuser, and
+          0005 FORCEs RLS onto owners — the first remote seed died on
+          accounts' WITH CHECK. Fix in the seed binary (disclosed,
+          beyond the three API touches because D5's prod seed cannot
+          function without it): single-connection pool + on NON-superuser
+          connections only, pin the seeded ADMIN's identity
+          (set_config session GUCs) before the load — admin scope is
+          every territory, so every WITH CHECK passes exactly as RLS
+          intends. Superuser dev runs skip the branch: proven
+          byte-identical afterward (anchors exact, all 265 audit rows
+          still NULL-actor). Managed seeds record the seeded admin as
+          the audit actor — truthful and disclosed.
+    Redeploys never touch data (proven: the reset is a separate command).
+  - **D6 — /api/health** (sanctioned touch c): unauthenticated 200 "ok",
+    no DB touch; the Render service health check points at it.
+  - **D7 — render.yaml blueprint** at the repo root describes the whole
+    topology (free Postgres 16 `plenum-db` + free Docker web service
+    `plenum`, oregon, healthCheckPath, autoDeploy off, env wiring).
+    The api reads APP_DATABASE_URL and the seed reads DATABASE_URL — both
+    mapped from the same database in the blueprint, no code change.
+    `render blueprints validate` passes modulo the repo-visibility item
+    below.
+  - **D8 — AI OFF in prod, provably.** No ANTHROPIC_API_KEY exists on the
+    service; AI_ASK_ENABLED=false and AI_DISCOUNT_ENABLED=false pinned.
+    Zero vendor spend possible from the live site.
+  - **D9 — MemoryStore stays** (accepted): redeploy/idle spin-down signs
+    everyone out; free-plan cold starts are tens of seconds. Documented in
+    README "Deploy" known behaviors, plus the free-Postgres 30-day expiry.
+  - **D10 — Privacy posture stated, not solved:** unguessable onrender.com
+    URL + demo login + 100% synthetic data; hard gate is a later add.
+    Documented in README verbatim ("who can see this").
+  - **Test maintenance, disclosed:** the P5 policy-parity test assumed the
+    signals census was generated the same UTC day as the request; the
+    window slid at midnight mid-unit and it tripped. Fixed clock-honest
+    (feed == in-window census; leftovers exactly the out-of-window rows
+    pending expiry). App behavior untouched.
+- **New dependency (the ONE permitted):** tower-http 0.6 (MIT),
+  `fs` feature only — ServeDir/ServeFile for the static tier. Nothing else
+  added (npm zero, crates zero beyond it).
+- **Provisioning record (free plans only — nothing that bills):**
+  - Auth path: the Render MCP token on this machine was unauthorized; the
+    authenticated surface is the Render CLI v2.15.1 (workspace "Dilip's
+    workspace", tea-d5ufur7fte5s73eaj0e0) and its stored API key against
+    the public REST API (used for creation calls the CLI lacks; the key
+    never left the machine, never printed, never committed).
+  - CREATED: Postgres `plenum-db` — dpg-d9go6b3bc2fs738vcm00-a, plan
+    free, region oregon, version 16, status available.
+  - Web service `plenum`: creation was BLOCKED at first attempt — the repo
+    was private and the Render workspace had no GitHub App grant for
+    tolani13/plenum ("repository … invalid or unfetchable"), which no API
+    can create. UNBLOCKED by D.'s call 2026-07-23: the repo was flipped
+    PUBLIC (recorded as a deliberate posture change — the code was already
+    audition material; secrets were never in it). The branch push needed
+    for the build (deploy-render → origin, pre-merge) was done and
+    disclosed — main untouched until PHASE 2.
+  - CREATED: web service `plenum` — srv-d9goii4vikkc739qverg, plan free,
+    region oregon, runtime docker (./Dockerfile), branch deploy-render,
+    autoDeploy no, healthCheckPath /api/health, env keys wired:
+    APP_DATABASE_URL + DATABASE_URL (internal connection string),
+    COOKIE_SECURE=true, MIGRATE_ON_BOOT=true, AI_ASK_ENABLED=false,
+    AI_DISCOUNT_ENABLED=false, RUST_LOG=info. LIVE URL:
+    https://plenum.onrender.com
+  - First deploy dep-d9goiicvikkc739qvflg (commit 6e8a6c3): LIVE in ~7
+    minutes; Render's health check on /api/health passed (that is what
+    "live" gates on). Pre-seed posture verified over HTTPS: health 200,
+    SPA served, login on the empty world = clean 401, no crash-loop.
+  - Access Control: ipAllowList entry 74.124.184.78/32 added (the
+    seed/reset source machine); external connections are otherwise
+    dropped at the proxy (the "0 bytes at EOF" signature).
+  - Seed executed against the live database (twice: initial load + the
+    reset rehearsal), redacted transcript in the session report:
+    migrations no-op-verified, "non-superuser connection — RLS identity
+    pinned to the seeded admin", ORDERS TOTAL 17353, opp checksum
+    3367519569, mv 120/195/1699/614, signals 40/12/28/168 = 248
+    (2026-07-23 clock).
+  - LIVE-URL proofs (https://plenum.onrender.com): VP customers
+    cumulative net 2467089087 cents ($24,670,890.87) · approvals inbox
+    exactly 1 pending (13158000 / 9698040 @ 28%) · /api/ai/status
+    {ask:false, discount:false} · serena territories = SE-1 only and her
+    state rows = 4 SE-1 states summing to 278301715 (her frozen anchor) ·
+    a VP-written activity persisted across a fresh session (Render
+    Postgres, not memory) · post-reset re-proof: net 2467089087,
+    approvals 1.
+- **Verification (local, all output in the session report):** check.sh ALL
+  CHECKS PASSED (60 tests incl. the clock-honest fix); docker build clean;
+  container smoke — health 200, SPA 200 on /, /command, /map, typed JSON
+  404 on unknown /api/*, VP login + 48 accounts through the container;
+  first-boot rehearsal on a scratch DB (created + dropped by the
+  rehearsal): migrations, EMPTY-world warn, health 200, then the seed FROM
+  THE IMAGE loading the world to the exact ledger anchor (2467089087
+  cents); dev parity — run-all.ps1 unchanged, both dev ports up, serena
+  RLS spot-check SE-1-only; secret grep: sk-ant absent, only empty
+  ANTHROPIC_API_KEY= placeholders, .env untracked.
+- **README de-branding (D.'s order, pre-PHASE-2, 2026-07-23):** with the
+  repo now public, README.md drops the company naming — the audition frame
+  reads "an AI Sales & Solutions Architect role in the industrial
+  dust-collection and air-filtration space", and every machine-local
+  working-directory path became repo-relative (`plenum` / `plenum\web`).
+  README only; local working docs unchanged. Committed on deploy-render.
+- **Phase gate: PENDING** — live-URL acceptance (checks 1–7) after the
+  GitHub grant; merge+push on D.'s literal "merge".
+
 ## 2026-07-22 · P5 Polish + demo hardening + Territory Map (FINAL phase)
 
 - **Unit:** P5 (Territory Map screen over a committed public-domain SVG,

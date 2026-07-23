@@ -91,6 +91,28 @@ PURPOSE — they are demo script material, not bugs to fix.
 Discipline: no-proof-no-run — report phases by walking acceptance checks, stating
 what D. will observe; never report done on internal tests alone.
 History: §14 devil's-case gate waived by D. 2026-07-17 (execute order = lock/go).
+Deploy (2026-07-22, branch deploy-render): repo now has origin =
+github.com/tolani13/plenum (private) — the ONE sanctioned remote; pushes
+only per deploy-unit protocol. Prod artifacts: Dockerfile (3-stage: SPA →
+rust 1.95 release api+seed → bookworm-slim, non-root), docker/entrypoint.sh
+(PORT→BIND_ADDR), render.yaml blueprint (free Postgres 16 plenum-db + free
+Docker web service plenum, oregon, healthCheckPath /api/health, autoDeploy
+off, AI flags false, NO key in prod). Env-gated code (dev byte-identical):
+GET /api/health (unauth 200); MIGRATE_ON_BOOT=true → ensure plenum_app role
+(NOLOGIN) + embedded migrations on boot + empty-world serves-with-warning;
+WEB_DIST static tier (tower-http fs, the one permitted dep, MIT) — SPA deep
+links 200 via ServeDir::fallback, unknown /api/* stays typed JSON 404.
+Seed in prod = explicit local run over TLS (external URL + ?sslmode=require
++ the DB's IP allowlist — 74.124.184.78/32 on file), never part of a
+deploy; `render jobs create` is paid-plan-only ("free tier plans are not
+supported for jobs"). The seed pins the seeded ADMIN's RLS identity on
+NON-superuser (managed) connections only — managed owners sit under the
+FORCEd RLS; local superuser seeds are byte-identical, NULL audit actor
+included. Live: https://plenum.onrender.com · svc srv-d9goii4vikkc739qverg
+· db dpg-d9go6b3bc2fs738vcm00-a (free PG16 expires ~30 days unless
+upgraded; blueprint + one seed restores). Render CLI v2.15.1 is the
+authenticated surface (workspace tea-d5ufur7fte5s73eaj0e0); its key funds
+REST calls for what the CLI lacks; free plans only.
 Machine note: DB host port is 5434 (native PostgreSQL owns 5432/5433 on D.'s
 machine — D.'s call 2026-07-17); container-internal port stays 5432, so every
 `docker compose exec db psql` command is unaffected. API port 5777, bind
