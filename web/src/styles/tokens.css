@@ -42,6 +42,39 @@
   --text-2xl: 2.5rem; /* 40px — KPI hero number */
   --text-2xl--line-height: 2.6rem;
 
+  /* ---- P5 · Territory Map palette (R3) ----------------------------------
+     Eight desaturated instrument hues for territory fills — the "low alpha"
+     ruling pre-blended against the graphite ground so every fill is one
+     opaque, controlled value (no runtime compositing surprises). Hue-spread
+     around the wheel; ALL far below the state-semantic tokens in chroma.
+     Flow blue stays reserved for data emphasis / selection; alarm and amber
+     are never territory fills (banded heat cells below own the warm ramp). */
+  --color-terr-ne1: #2f4356; /* NE-1 — atlantic steel   */
+  --color-terr-se1: #2f4b3d; /* SE-1 — piedmont pine    */
+  --color-terr-mw1: #4a4a35; /* MW-1 — prairie khaki    */
+  --color-terr-sc1: #52412f; /* SC-1 — canyon umber     */
+  --color-terr-mt1: #453b54; /* MT-1 — granite violet   */
+  --color-terr-w1: #27454f; /*  W-1 — pacific teal     */
+  --color-terr-ce1: #3a3d5c; /* CE-1 — laurentian indigo */
+  --color-terr-cw1: #4c3a4a; /* CW-1 — chinook plum     */
+  /* Map furniture: the ocean sits BELOW the page graphite; the graticule is
+     one quiet step above the ocean; out-of-scope landmass is a mute
+     silhouette (shape is config, money is scoped — R3). */
+  --color-ocean: #080c11;
+  --color-graticule: #101a24;
+  --color-land-dim: #161d26;
+
+  /* ---- P5 · Leakage heat ramp (R1) ---------------------------------------
+     Five bands for rep × family cells, keyed RELATIVE to the visible table's
+     aggregate leakage (the P2 LED-band logic, extended): 0 = cooler than the
+     book, 1 = at the book, 2/3 = warming, 4 = the worst band — the ONLY band
+     allowed to reach toward the alarm hue. */
+  --color-heat-0: #182430;
+  --color-heat-1: #262e33;
+  --color-heat-2: #3f382a;
+  --color-heat-3: #4e3a28;
+  --color-heat-4: #56262c;
+
   /* ---- radius (2–4px — instrument corners, not pills) ------------------- */
   --radius-sm: 2px;
   --radius: 3px;

@@ -10,6 +10,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { apiGet, apiPatch, apiPost } from "./api";
+import { FETCH_LIMIT as LIMIT, q } from "./fetchAll";
 import type {
   AccountDetail,
   AccountItem,
@@ -23,9 +24,6 @@ import type {
   QuoteListRow,
   StageResult,
 } from "./types";
-
-const q = encodeURIComponent;
-const LIMIT = 200;
 
 // ── reads ───────────────────────────────────────────────────────────────────
 
@@ -192,6 +190,30 @@ export function useRejectQuote() {
       qc.invalidateQueries({ queryKey: ["quote", quote.id] });
       qc.invalidateQueries({ queryKey: ["quote-audit", quote.id] });
     },
+  });
+}
+
+// P5 (R9a): the + New account write. POST /api/accounts has scope-enforced
+// since P3 (route-only); this hook is the first UI consumer.
+export interface CreateAccountInput {
+  name: string;
+  industry: string;
+  territory_id: string;
+  status: string;
+  parent_account_id?: string | null;
+}
+
+export interface CreatedAccount {
+  id: string;
+  name: string;
+}
+
+export function useCreateAccount() {
+  const invalidate = useCrmInvalidate();
+  return useMutation({
+    mutationFn: (input: CreateAccountInput) =>
+      apiPost<CreatedAccount>("/api/accounts", input),
+    onSuccess: () => invalidate(),
   });
 }
 

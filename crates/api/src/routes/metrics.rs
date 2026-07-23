@@ -33,36 +33,14 @@ use uuid::Uuid;
 use crate::auth::SessionUser;
 use crate::error::ApiError;
 use crate::rls::rls_tx;
+use crate::routes::common::parse_page;
 use crate::state::AppState;
 
-const DEFAULT_LIMIT: i64 = 50;
-const MAX_LIMIT: i64 = 200;
-
 // ── shared param plumbing ───────────────────────────────────────────────────
-
-fn parse_int(value: Option<String>, default: i64, name: &str) -> Result<i64, ApiError> {
-    match value {
-        None => Ok(default),
-        Some(s) => s
-            .parse::<i64>()
-            .map_err(|_| ApiError::Invalid(format!("{name} must be an integer"))),
-    }
-}
-
-/// limit (default 50, max 200) / offset >= 0 — on every endpoint.
-fn parse_page(limit: Option<String>, offset: Option<String>) -> Result<(i64, i64), ApiError> {
-    let limit = parse_int(limit, DEFAULT_LIMIT, "limit")?;
-    if !(1..=MAX_LIMIT).contains(&limit) {
-        return Err(ApiError::Invalid(format!(
-            "limit must be between 1 and {MAX_LIMIT}"
-        )));
-    }
-    let offset = parse_int(offset, 0, "offset")?;
-    if offset < 0 {
-        return Err(ApiError::Invalid("offset must be >= 0".into()));
-    }
-    Ok((limit, offset))
-}
+// P5 (R9b): the P0-era local copies of parse_int/parse_page moved to
+// routes/common.rs when P3 landed; this module now uses the shared helpers —
+// identical grammar (limit default 50, max 200; offset >= 0), identical 422
+// messages, proven by the untouched P1 test matrix.
 
 fn parse_period(value: Option<String>) -> Result<Period, ApiError> {
     let raw = value.ok_or_else(|| {
@@ -1073,6 +1051,18 @@ pub struct LeakageParams {
     by: Option<String>,
     kind: Option<String>,
     basis: Option<String>,
+    /// P5 (R1): which math feeds the OUTLIER zone.
+    ///   `period` (default) — the P1 behavior verbatim: stats and candidates
+    ///   from the requested period/kind slice (σ = stddev_samp), threshold =
+    ///   median + discount_sigma × σ. At the seeded default (2.00) this is
+    ///   byte-identical to the old hardcoded 2σ — the equivalence proof.
+    ///   `policy` — THE SAME math and config the discount_anomaly generator
+    ///   uses: family stats over ALL history (stddev_pop), candidates in the
+    ///   trailing signal_policy.discount_window_days, threshold = median +
+    ///   discount_sigma × σ. The Leakage screen's outlier feed asks for this,
+    ///   so its rows and the signal chips can never disagree. Ignores
+    ///   period/kind by construction (the generator has neither axis).
+    outliers: Option<String>,
     limit: Option<String>,
     offset: Option<String>,
 }
@@ -1095,6 +1085,13 @@ pub struct DistributionBucket {
 #[derive(Serialize)]
 pub struct OutlierRow {
     order_id: Uuid,
+    /// P5 (R1) disclosed additions: the line identity + account link the
+    /// Leakage screen's outlier feed needs (row → account 360), and the
+    /// matching discount_anomaly signal when one exists (matched by
+    /// order_line under the caller's RLS — the chip).
+    order_line_id: Uuid,
+    account_id: Uuid,
+    territory_code: String,
     ordered_on: NaiveDate,
     account_name: String,
     rep_name: String,
@@ -1107,6 +1104,19 @@ pub struct OutlierRow {
     discount_pct: f64,
     family_median_pct: f64,
     threshold_pct: f64,
+    signal_id: Option<Uuid>,
+    signal_status: Option<String>,
+}
+
+/// P5 (R1) disclosed addition: one rep × family money cell for the heat
+/// table (the second signature element). Client derives leakage/percent and
+/// the row/column totals; the payload stays cents-only facts.
+#[derive(Serialize)]
+pub struct HeatCell {
+    rep_name: String,
+    family: String,
+    gross_cents: i64,
+    net_cents: i64,
 }
 
 #[derive(Serialize)]
@@ -1117,6 +1127,7 @@ pub struct LeakagePage {
     total: i64,
     discount_distribution: Vec<DistributionBucket>,
     outliers: Vec<OutlierRow>,
+    heat: Vec<HeatCell>,
 }
 
 /// Histogram edges, lower-bound inclusive: [0,5) [5,10) [10,15) [15,20)
@@ -1145,6 +1156,20 @@ pub async fn leakage(
         Some(_) => {
             return Err(ApiError::Invalid(
                 "by must be 'rep', 'territory', 'family', or 'account'".into(),
+            ))
+        }
+    };
+    let outlier_policy = match params
+        .outliers
+        .as_deref()
+        .map(|s| s.trim().to_ascii_lowercase())
+        .as_deref()
+    {
+        None | Some("period") => false,
+        Some("policy") => true,
+        Some(_) => {
+            return Err(ApiError::Invalid(
+                "outliers must be 'period' or 'policy'".into(),
             ))
         }
     };
@@ -1226,54 +1251,149 @@ pub async fn leakage(
     .fetch_all(&mut *tx)
     .await?;
 
-    // Outliers, spec §5.5 wording implemented verbatim: line items with
-    // discount_pct more than 2σ above their family's MEDIAN discount
-    // (σ = sample stddev within the same family/period/kind slice; families
-    // with fewer than 2 lines have no σ and produce no outliers). Capped by
-    // `limit`.
-    let outliers = sqlx::query!(
-        r#"WITH fam_stats AS (
-               SELECT family,
-                      percentile_cont(0.5) WITHIN GROUP
-                          (ORDER BY discount_pct::float8) AS median_pct,
-                      stddev_samp(discount_pct::float8) AS sd
-               FROM v_order_facts
-               WHERE ($1::date IS NULL OR ordered_on >= $1)
-                 AND ($2::date IS NULL OR ordered_on < $2)
+    // Outliers, spec §5.5. Two modes (R1):
+    //
+    // period (default) — the P1 behavior verbatim except the σ multiplier now
+    // reads signal_policy.discount_sigma instead of a hardcoded 2. numeric
+    // 2.00 casts to float8 2.0 exactly, so at the seeded default every
+    // computed threshold — and therefore every returned row — is
+    // byte-identical to the P1 output (the PRE-3/report equivalence proof).
+    // Stats stay period/kind-sliced with stddev_samp, exactly as before.
+    //
+    // policy — the discount_anomaly generator's math verbatim (0013):
+    // family stats over ALL history with stddev_pop, candidates in the
+    // trailing discount_window_days, threshold = median + discount_sigma × σ.
+    // No period/kind axis, because the generator has none — this is the
+    // Leakage screen's outlier zone, and its rows match the signal chips 1:1.
+    //
+    // Both modes LEFT JOIN the caller-visible discount_anomaly signal by
+    // order_line (the chip), and carry the line/account identity the screen
+    // links through — disclosed payload additions, R1.
+    let outliers = if outlier_policy {
+        sqlx::query_as!(
+            OutlierRow,
+            r#"WITH sp AS (SELECT * FROM signal_policy),
+               fam_stats AS (
+                   SELECT family,
+                          percentile_cont(0.5) WITHIN GROUP
+                              (ORDER BY discount_pct::float8) AS median_pct,
+                          stddev_pop(discount_pct::float8) AS sd
+                   FROM v_order_facts
+                   GROUP BY family
+               )
+               SELECT f.order_id AS "order_id!",
+                      f.order_line_id AS "order_line_id!",
+                      f.account_id AS "account_id!",
+                      f.territory_code AS "territory_code!",
+                      f.ordered_on AS "ordered_on!",
+                      f.account_name AS "account_name!",
+                      f.rep_name AS "rep_name!",
+                      f.product_sku AS "product_sku!",
+                      f.product_name AS "product_name!",
+                      f.family AS "family!",
+                      f.qty AS "qty!",
+                      f.list_unit_cents AS "list_unit_cents!",
+                      f.net_unit_cents AS "net_unit_cents!",
+                      f.discount_pct::float8 AS "discount_pct!",
+                      s.median_pct AS "family_median_pct!",
+                      (s.median_pct + sp.discount_sigma * s.sd) AS "threshold_pct!",
+                      sig.id AS "signal_id?",
+                      sig.status::text AS "signal_status?"
+               FROM v_order_facts f
+               JOIN fam_stats s ON s.family = f.family
+               CROSS JOIN sp
+               LEFT JOIN signals sig
+                      ON sig.order_line_id = f.order_line_id
+                     AND sig.type = 'discount_anomaly'
+               WHERE f.ordered_on >= CURRENT_DATE - sp.discount_window_days
+                 AND s.sd > 0
+                 AND f.discount_pct::float8 > s.median_pct + sp.discount_sigma * s.sd
+               ORDER BY f.discount_pct DESC, f.order_line_id
+               LIMIT $1"#,
+            limit
+        )
+        .fetch_all(&mut *tx)
+        .await?
+    } else {
+        sqlx::query_as!(
+            OutlierRow,
+            r#"WITH sp AS (SELECT discount_sigma::float8 AS sigma FROM signal_policy),
+               fam_stats AS (
+                   SELECT family,
+                          percentile_cont(0.5) WITHIN GROUP
+                              (ORDER BY discount_pct::float8) AS median_pct,
+                          stddev_samp(discount_pct::float8) AS sd
+                   FROM v_order_facts
+                   WHERE ($1::date IS NULL OR ordered_on >= $1)
+                     AND ($2::date IS NULL OR ordered_on < $2)
+                     AND (NOT $3::boolean
+                          OR ordered_on >= CURRENT_DATE - interval '12 months')
+                     AND ($4::text = 'all' OR kind::text = $4)
+                   GROUP BY family
+               )
+               SELECT f.order_id AS "order_id!",
+                      f.order_line_id AS "order_line_id!",
+                      f.account_id AS "account_id!",
+                      f.territory_code AS "territory_code!",
+                      f.ordered_on AS "ordered_on!",
+                      f.account_name AS "account_name!",
+                      f.rep_name AS "rep_name!",
+                      f.product_sku AS "product_sku!",
+                      f.product_name AS "product_name!",
+                      f.family AS "family!",
+                      f.qty AS "qty!",
+                      f.list_unit_cents AS "list_unit_cents!",
+                      f.net_unit_cents AS "net_unit_cents!",
+                      f.discount_pct::float8 AS "discount_pct!",
+                      s.median_pct AS "family_median_pct!",
+                      (s.median_pct + sp.sigma * s.sd) AS "threshold_pct!",
+                      sig.id AS "signal_id?",
+                      sig.status::text AS "signal_status?"
+               FROM v_order_facts f
+               JOIN fam_stats s ON s.family = f.family
+               CROSS JOIN sp
+               LEFT JOIN signals sig
+                      ON sig.order_line_id = f.order_line_id
+                     AND sig.type = 'discount_anomaly'
+               WHERE ($1::date IS NULL OR f.ordered_on >= $1)
+                 AND ($2::date IS NULL OR f.ordered_on < $2)
                  AND (NOT $3::boolean
-                      OR ordered_on >= CURRENT_DATE - interval '12 months')
-                 AND ($4::text = 'all' OR kind::text = $4)
-               GROUP BY family
-           )
-           SELECT f.order_id AS "order_id!",
-                  f.ordered_on AS "ordered_on!",
-                  f.account_name AS "account_name!",
-                  f.rep_name AS "rep_name!",
-                  f.product_sku AS "product_sku!",
-                  f.product_name AS "product_name!",
-                  f.family AS "family!",
-                  f.qty AS "qty!",
-                  f.list_unit_cents AS "list_unit_cents!",
-                  f.net_unit_cents AS "net_unit_cents!",
-                  f.discount_pct::float8 AS "discount_pct!",
-                  s.median_pct AS "family_median_pct!",
-                  (s.median_pct + 2 * s.sd) AS "threshold_pct!"
-           FROM v_order_facts f
-           JOIN fam_stats s ON s.family = f.family
-           WHERE ($1::date IS NULL OR f.ordered_on >= $1)
-             AND ($2::date IS NULL OR f.ordered_on < $2)
+                      OR f.ordered_on >= CURRENT_DATE - interval '12 months')
+                 AND ($4::text = 'all' OR f.kind::text = $4)
+                 AND s.sd IS NOT NULL AND s.sd > 0
+                 AND f.discount_pct::float8 > s.median_pct + sp.sigma * s.sd
+               ORDER BY f.discount_pct DESC, f.order_line_id
+               LIMIT $5"#,
+            start,
+            end,
+            ttm,
+            kind.as_str(),
+            limit
+        )
+        .fetch_all(&mut *tx)
+        .await?
+    };
+
+    // The rep × family heat cells (R1) — the whole visible slice, no
+    // pagination (12 reps × ~13 families at VP view). RLS-scoped like every
+    // other read here; the client derives leakage %, bands, and totals.
+    let heat = sqlx::query_as!(
+        HeatCell,
+        r#"SELECT rep_name AS "rep_name!", family AS "family!",
+                  SUM(gross_cents)::bigint AS "gross_cents!",
+                  SUM(net_cents)::bigint AS "net_cents!"
+           FROM v_order_facts
+           WHERE ($1::date IS NULL OR ordered_on >= $1)
+             AND ($2::date IS NULL OR ordered_on < $2)
              AND (NOT $3::boolean
-                  OR f.ordered_on >= CURRENT_DATE - interval '12 months')
-             AND ($4::text = 'all' OR f.kind::text = $4)
-             AND s.sd IS NOT NULL AND s.sd > 0
-             AND f.discount_pct::float8 > s.median_pct + 2 * s.sd
-           ORDER BY f.discount_pct DESC, f.order_line_id
-           LIMIT $5"#,
+                  OR ordered_on >= CURRENT_DATE - interval '12 months')
+             AND ($4::text = 'all' OR kind::text = $4)
+           GROUP BY rep_name, family
+           ORDER BY rep_name, family"#,
         start,
         end,
         ttm,
-        kind.as_str(),
-        limit
+        kind.as_str()
     )
     .fetch_all(&mut *tx)
     .await?;
@@ -1304,24 +1424,17 @@ pub async fn leakage(
         })
         .collect();
 
-    let outliers = outliers
-        .into_iter()
-        .map(|r| OutlierRow {
-            order_id: r.order_id,
-            ordered_on: r.ordered_on,
-            account_name: r.account_name,
-            rep_name: r.rep_name,
-            product_sku: r.product_sku,
-            product_name: r.product_name,
-            family: r.family,
-            qty: r.qty,
-            list_unit_cents: r.list_unit_cents,
-            net_unit_cents: r.net_unit_cents,
-            discount_pct: round2(r.discount_pct),
-            family_median_pct: round2(r.family_median_pct),
-            threshold_pct: round2(r.threshold_pct),
-        })
-        .collect();
+    // The P1 display rounding, unchanged (2 decimals on the three percent
+    // fields) — part of the byte-identity contract for the period mode.
+    let outliers = {
+        let mut rows = outliers;
+        for r in &mut rows {
+            r.discount_pct = round2(r.discount_pct);
+            r.family_median_pct = round2(r.family_median_pct);
+            r.threshold_pct = round2(r.threshold_pct);
+        }
+        rows
+    };
 
     Ok(Json(LeakagePage {
         items,
@@ -1330,6 +1443,7 @@ pub async fn leakage(
         total,
         discount_distribution,
         outliers,
+        heat,
     }))
 }
 

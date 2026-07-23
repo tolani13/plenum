@@ -73,6 +73,9 @@ pub struct SignalRow {
     pub assigned_at: Option<DateTime<Utc>>,
     pub actioned_at: Option<DateTime<Utc>>,
     pub dismissed_at: Option<DateTime<Utc>>,
+    /// P5 (R4): when the generator auto-expired the card (predicate stopped
+    /// holding). NULL on every other status; cleared again on reopen.
+    pub expired_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize)]
@@ -94,15 +97,16 @@ pub struct SignalListParams {
     offset: Option<String>,
 }
 
-/// status grammar: the four lifecycle states, plus `active` (= open ∪
-/// assigned) as the queue's default view.
+/// status grammar: the five lifecycle states, plus `active` (= open ∪
+/// assigned) as the queue's default view. `expired` (P5, R4) is the
+/// machine-retired shelf — never part of `active`.
 fn parse_status_filter(raw: Option<String>) -> Result<String, ApiError> {
     let s = raw.unwrap_or_else(|| "active".to_string());
     let s = s.trim().to_ascii_lowercase();
     match s.as_str() {
-        "active" | "open" | "assigned" | "actioned" | "dismissed" => Ok(s),
+        "active" | "open" | "assigned" | "actioned" | "dismissed" | "expired" => Ok(s),
         _ => Err(ApiError::Invalid(
-            "status must be one of active, open, assigned, actioned, dismissed".into(),
+            "status must be one of active, open, assigned, actioned, dismissed, expired".into(),
         )),
     }
 }
@@ -171,7 +175,8 @@ pub async fn list_signals(
                   s.opened_at,
                   s.assigned_at,
                   s.actioned_at,
-                  s.dismissed_at
+                  s.dismissed_at,
+                  s.expired_at
            FROM signals s
            JOIN accounts a ON a.id = s.account_id
            JOIN territories t ON t.id = a.territory_id
@@ -267,7 +272,8 @@ pub async fn account_signals(
                   s.opened_at,
                   s.assigned_at,
                   s.actioned_at,
-                  s.dismissed_at
+                  s.dismissed_at,
+                  s.expired_at
            FROM signals s
            JOIN accounts a ON a.id = s.account_id
            JOIN territories t ON t.id = a.territory_id
@@ -338,7 +344,8 @@ async fn load_signal(
                   s.opened_at,
                   s.assigned_at,
                   s.actioned_at,
-                  s.dismissed_at
+                  s.dismissed_at,
+                  s.expired_at
            FROM signals s
            JOIN accounts a ON a.id = s.account_id
            JOIN territories t ON t.id = a.territory_id
@@ -519,6 +526,12 @@ async fn load_active_signal(
         SignalStatus::Actioned | SignalStatus::Dismissed => Err(ApiError::Invalid(
             "an actioned or dismissed signal is terminal".into(),
         )),
+        // R4: expired cards belong to the machine — no human write-backs.
+        // The generator reopens the card itself if its predicate returns.
+        SignalStatus::Expired => Err(ApiError::Invalid(
+            "an expired signal is closed — the generator reopens it if its predicate returns"
+                .into(),
+        )),
     }
 }
 
@@ -657,6 +670,9 @@ pub struct GeneratedType {
     signal_type: String,
     inserted: i64,
     updated: i64,
+    /// P5 (R4): open cards of this type whose predicate stopped holding on
+    /// this run — auto-expired, never touching human-owned statuses.
+    expired: i64,
 }
 
 #[derive(Serialize)]
@@ -675,7 +691,7 @@ pub async fn generate_signals(
     let mut tx = rls_tx(&state.pool, &user).await?;
     let rows = sqlx::query!(
         r#"SELECT signal_type AS "signal_type!", inserted AS "inserted!",
-                  updated AS "updated!"
+                  updated AS "updated!", expired AS "expired!"
            FROM generate_signals()"#
     )
     .fetch_all(&mut *tx)
@@ -689,6 +705,7 @@ pub async fn generate_signals(
                 signal_type: r.signal_type,
                 inserted: r.inserted,
                 updated: r.updated,
+                expired: r.expired,
             })
             .collect(),
     }))

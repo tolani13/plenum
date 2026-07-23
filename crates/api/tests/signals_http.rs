@@ -539,6 +539,7 @@ async fn generate_is_admin_gated_idempotent_and_audit_silent() {
     for g in generated {
         assert_eq!(g["inserted"], 0, "second same-day run inserts nothing: {g}");
         assert_eq!(g["updated"], 0, "second same-day run updates nothing: {g}");
+        assert_eq!(g["expired"], 0, "second same-day run expires nothing: {g}");
     }
     assert_eq!(
         audit_after - audit_before,
@@ -894,14 +895,19 @@ async fn fixture_worlds_produce_signals_from_pure_table_data() {
     .expect("count");
     assert_eq!(fixture_anomalies, 1, "the 5% lines are not anomalies");
 
-    // Idempotency INSIDE the fixture world: a second run changes nothing.
-    let second: Vec<(String, i64, i64)> =
-        sqlx::query_as("SELECT signal_type, inserted, updated FROM generate_signals()")
+    // Idempotency INSIDE the fixture world: a second run changes nothing —
+    // and (P5) expires nothing, because every emitted key is still emitted.
+    let second: Vec<(String, i64, i64, i64)> =
+        sqlx::query_as("SELECT signal_type, inserted, updated, expired FROM generate_signals()")
             .fetch_all(&mut *tx)
             .await
             .expect("second generate");
-    for (t, ins, upd) in &second {
-        assert_eq!((*ins, *upd), (0, 0), "second run must be all-zero for {t}");
+    for (t, ins, upd, expd) in &second {
+        assert_eq!(
+            (*ins, *upd, *expd),
+            (0, 0, 0),
+            "second run must be all-zero for {t}"
+        );
     }
 
     // Roll it all back — the fixture world never existed.

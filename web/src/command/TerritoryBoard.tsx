@@ -59,7 +59,10 @@ export function TerritoryBoard({
       <div
         data-testid="territory-board"
         data-board-variant="cartogram"
-        className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 min-[900px]:grid-cols-4"
+        // h-full + auto-rows-fr: when Command's R8 flex column hands this
+        // grid real height (tall viewports), the two tile rows split it;
+        // at content height auto-rows-fr just keeps rows uniform.
+        className="grid h-full auto-rows-fr grid-cols-1 gap-3 min-[480px]:grid-cols-2 min-[900px]:grid-cols-4"
       >
         {CARTOGRAM_SLOTS.map((code) => {
           const row = byCode.get(code);

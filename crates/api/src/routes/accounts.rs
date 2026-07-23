@@ -15,14 +15,14 @@ use uuid::Uuid;
 use crate::auth::SessionUser;
 use crate::error::ApiError;
 use crate::rls::rls_tx;
+use crate::routes::common::parse_page;
 use crate::routes::signals::{account_signals, SignalRow};
 use crate::state::AppState;
 
-const DEFAULT_LIMIT: i64 = 50;
-const MAX_LIMIT: i64 = 200;
-
 /// Raw string params so a non-numeric value becomes a typed 422, not a
-/// framework 400.
+/// framework 400. P5 (R9b): parsing itself now rides the shared
+/// routes/common.rs helpers — identical grammar and 422 messages to the P0
+/// local copy this replaces.
 #[derive(Deserialize)]
 pub struct PageParams {
     limit: Option<String>,
@@ -48,30 +48,12 @@ pub struct AccountsPage {
     total: i64,
 }
 
-fn parse_param(value: Option<String>, default: i64, name: &str) -> Result<i64, ApiError> {
-    match value {
-        None => Ok(default),
-        Some(s) => s
-            .parse::<i64>()
-            .map_err(|_| ApiError::Invalid(format!("{name} must be an integer"))),
-    }
-}
-
 pub async fn list_accounts(
     State(state): State<AppState>,
     user: SessionUser,
     Query(params): Query<PageParams>,
 ) -> Result<Json<AccountsPage>, ApiError> {
-    let limit = parse_param(params.limit, DEFAULT_LIMIT, "limit")?;
-    if !(1..=MAX_LIMIT).contains(&limit) {
-        return Err(ApiError::Invalid(format!(
-            "limit must be between 1 and {MAX_LIMIT}"
-        )));
-    }
-    let offset = parse_param(params.offset, 0, "offset")?;
-    if offset < 0 {
-        return Err(ApiError::Invalid("offset must be >= 0".into()));
-    }
+    let (limit, offset) = parse_page(params.limit, params.offset)?;
 
     let mut tx = rls_tx(&state.pool, &user).await?;
 

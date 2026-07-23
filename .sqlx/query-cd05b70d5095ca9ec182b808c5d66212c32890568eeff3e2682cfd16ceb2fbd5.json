@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.state AS \"state_code!\",\n                  t.code AS \"territory_code!\",\n                  SUM(f.gross_cents)::bigint AS \"gross_cents!\",\n                  SUM(f.net_cents)::bigint AS \"net_cents!\",\n                  count(DISTINCT f.order_id) AS \"order_count!\"\n           FROM v_order_facts f\n           JOIN sites s ON s.id = f.site_id\n           JOIN territories t ON t.id = f.territory_id\n           WHERE ($1::date IS NULL OR f.ordered_on >= $1)\n             AND ($2::date IS NULL OR f.ordered_on < $2)\n             AND (NOT $3::boolean\n                  OR f.ordered_on >= CURRENT_DATE - interval '12 months')\n             AND ($4::text = 'all' OR f.kind::text = $4)\n           GROUP BY s.state, t.code\n           ORDER BY CASE WHEN $5 = 'gross' THEN SUM(f.gross_cents)\n                         ELSE SUM(f.net_cents) END DESC,\n                    s.state\n           LIMIT $6 OFFSET $7",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "net_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "order_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Bool",
+        "Text",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "cd05b70d5095ca9ec182b808c5d66212c32890568eeff3e2682cfd16ceb2fbd5"
+}

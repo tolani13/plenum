@@ -1,18 +1,21 @@
-//! Router assembly: the P0 surface, P1's metrics + admin refresh, and P3's CRM
+//! Router assembly: the P0 surface, P1's metrics + admin refresh, P3's CRM
 //! operational core (accounts 360, opportunities, quotes, policy, products,
-//! activities).
+//! activities), P4's signals/AI/telemetry, and P5's map states + data-quality
+//! reads.
 
 pub mod accounts;
 pub mod activities;
 pub mod admin;
 pub mod auth;
 pub mod common;
+pub mod data_quality;
 pub mod metrics;
 pub mod opportunities;
 pub mod policy;
 pub mod products;
 pub mod quotes;
 pub mod signals;
+pub mod states;
 pub mod telemetry;
 
 use axum::extract::Request;
@@ -90,6 +93,8 @@ pub fn app(state: AppState, cookie_secure: bool) -> Router {
         .route("/api/metrics/leakage", get(metrics::leakage))
         .route("/api/metrics/coverage", get(metrics::coverage))
         .route("/api/metrics/defection", get(metrics::defection))
+        .route("/api/metrics/states", get(states::states))
+        .route("/api/data-quality", get(data_quality::data_quality))
         .route("/api/admin/refresh-rollups", post(admin::refresh_rollups))
         .route(
             "/api/admin/generate-signals",

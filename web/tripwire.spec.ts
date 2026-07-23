@@ -1,20 +1,26 @@
 // Responsive tripwire + rep-scope assertions — gate P2-2's automated half,
-// extended in P3 (Pipeline, Quotes, Account 360, quote detail) and in P4
-// (Signals, Ask).
+// extended in P3 (Pipeline, Quotes, Account 360, quote detail), P4 (Signals,
+// Ask), and P5 (Territory Map, Leakage, Data Quality).
 //
 // Layout: every screen at every supported width must render no wider than its
 // viewport (spec §8: document.documentElement.scrollWidth <= window.innerWidth
 // — a page-level horizontal scrollbar is a build failure).
-//   11 screens × 5 widths = 55 layout observables.
-//   (9 static: login, command, leaderboards ×3, pipeline, quotes, signals,
-//    ask; 2 dynamic: /accounts/:id and /quotes/:id, ids resolved in-test.)
+//   14 screens × 5 widths = 70 layout observables.
+//   (12 static: login, command, map, leaderboards ×3, leakage, pipeline,
+//    quotes, signals, ask, data-quality; 2 dynamic: /accounts/:id and
+//    /quotes/:id, ids resolved in-test.)
 //
-// Scope: THREE assertions on the surface —
+// Scope: FIVE assertions on the surface —
 //   · a rep (SE-1) sees EXACTLY ONE territory tile on Command, and it is SE-1;
 //   · a rep's Pipeline shows exactly the opportunities the API returns for them,
 //     and every one is SE-1;
 //   · P4: a rep's Signals queue renders exactly the API's active rows for
-//     them, and every card is SE-1 — no foreign territory code anywhere.
+//     them (every lane expanded first — R6 pagination), all SE-1;
+//   · P5 leakage-scope: the rep's heat table contains her rows and ONLY her
+//     rows — no foreign rep name anywhere in the grid;
+//   · P5 map-scope: the rep's map DOM contains NO dollar value inside any
+//     element attributed to a foreign territory (fills are config; money is
+//     scoped).
 //
 // Requires the API on 127.0.0.1:5777 (this dev server only proxies to it).
 
@@ -33,13 +39,16 @@ const VIEWPORTS = [
 const STATIC_SCREENS = [
   { name: "login", path: "/login", auth: false },
   { name: "command", path: "/command", auth: true },
+  { name: "map", path: "/map", auth: true },
   { name: "leaderboards-reps", path: "/leaderboards?tab=reps", auth: true },
   { name: "leaderboards-items", path: "/leaderboards?tab=items", auth: true },
   { name: "leaderboards-customers", path: "/leaderboards?tab=customers", auth: true },
+  { name: "leakage", path: "/leakage", auth: true },
   { name: "pipeline", path: "/pipeline", auth: true },
   { name: "quotes", path: "/quotes", auth: true },
   { name: "signals", path: "/signals", auth: true },
   { name: "ask", path: "/ask", auth: true },
+  { name: "data-quality", path: "/data-quality", auth: true },
 ] as const;
 
 async function loginAs(page: Page, email: string): Promise<void> {
@@ -72,7 +81,7 @@ async function overflowPx(page: Page): Promise<number> {
   );
 }
 
-test("tripwire: responsive layout (55) + rep scope (command + pipeline + signals)", async ({
+test("tripwire: responsive layout (70) + rep scope (command + pipeline + signals + leakage + map)", async ({
   browser,
 }) => {
   const authed: BrowserContext = await browser.newContext();
@@ -171,6 +180,8 @@ test("tripwire: responsive layout (55) + rep scope (command + pipeline + signals
 
   // 3 · P4 Signals — the queue renders exactly the rep's RLS-scoped active
   // rows, and every one is SE-1 (no foreign territory code on any card).
+  // P5 (R6): lanes paginate at 25, so expand every lane first — which also
+  // exercises the Show-more control itself.
   const apiSignals = await repPage.evaluate(
     async () =>
       (await (await fetch("/api/signals?status=active&limit=200")).json())
@@ -179,6 +190,11 @@ test("tripwire: responsive layout (55) + rep scope (command + pipeline + signals
   const signalsAllSe1 = apiSignals.every((s) => s.territory_code === "SE-1");
   await repPage.goto("/signals");
   await waitReady(repPage);
+  for (;;) {
+    const more = repPage.getByTestId("lane-more");
+    if ((await more.count()) === 0) break;
+    await more.first().click();
+  }
   const signalCardCount = await repPage.getByTestId("signal-card").count();
   const signalsScopeOk = signalsAllSe1 && signalCardCount === apiSignals.length;
   console.log(
@@ -186,13 +202,75 @@ test("tripwire: responsive layout (55) + rep scope (command + pipeline + signals
       ? `  PASS  signals-scope  (${signalCardCount} cards, all SE-1)`
       : `  FAIL  signals-scope  (${signalCardCount} cards vs ${apiSignals.length} api, allSe1=${signalsAllSe1})`,
   );
+
+  // 4 · P5 Leakage — the rep's heat table holds her rows and ONLY her rows.
+  const apiHeatReps = await repPage.evaluate(async () => {
+    const page = await (
+      await fetch("/api/metrics/leakage?period=cumulative&limit=200")
+    ).json();
+    return [
+      ...new Set((page.heat as { rep_name: string }[]).map((c) => c.rep_name)),
+    ].sort();
+  });
+  await repPage.goto("/leakage");
+  await waitReady(repPage);
+  const domHeatReps = [
+    ...new Set(
+      await repPage
+        .getByTestId("heat-rep")
+        .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.rep)),
+    ),
+  ].sort();
+  const leakageScopeOk =
+    domHeatReps.length > 0 &&
+    JSON.stringify(domHeatReps) === JSON.stringify(apiHeatReps) &&
+    domHeatReps.every((r) => r === "Serena Estes");
+  console.log(
+    leakageScopeOk
+      ? `  PASS  leakage-scope  (heat reps = [${domHeatReps.join(", ")}])`
+      : `  FAIL  leakage-scope  (dom=[${domHeatReps.join(", ")}] api=[${apiHeatReps.join(", ")}])`,
+  );
+
+  // 5 · P5 Territory Map — every element attributed to a FOREIGN territory
+  // must carry no dollar value; the map itself must be fully drawn (shape is
+  // config, money is scoped).
+  const myCodes = await repPage.evaluate(
+    async () =>
+      (await (await fetch("/api/auth/me")).json()).territories as string[],
+  );
+  await repPage.goto("/map");
+  await waitReady(repPage);
+  const mapAudit = await repPage.evaluate((scope: string[]) => {
+    const own = new Set(scope);
+    const nodes = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-territory]"),
+    );
+    const foreignWithDollars = nodes
+      .filter((n) => {
+        const t = n.dataset.territory ?? "";
+        return t !== "" && !own.has(t);
+      })
+      .filter((n) => (n.textContent ?? "").includes("$"))
+      .map((n) => `${n.tagName}[${n.dataset.territory}]`);
+    const statesDrawn = document.querySelectorAll("[data-state]").length;
+    return { foreignWithDollars, statesDrawn };
+  }, myCodes);
+  const mapScopeOk =
+    mapAudit.foreignWithDollars.length === 0 && mapAudit.statesDrawn >= 53;
+  console.log(
+    mapScopeOk
+      ? `  PASS  map-scope  (${mapAudit.statesDrawn} shapes drawn, 0 foreign $)`
+      : `  FAIL  map-scope  (foreign $ in: ${mapAudit.foreignWithDollars.join(", ")}; shapes=${mapAudit.statesDrawn})`,
+  );
   await repPage.close();
 
   console.log(
     `\nTRIPWIRE ${pass}/${expected} layout ${failures.length === 0 ? "PASS" : "FAIL"} · ` +
       `command-scope ${commandScopeOk ? "PASS" : "FAIL"} · ` +
       `pipeline-scope ${pipelineScopeOk ? "PASS" : "FAIL"} · ` +
-      `signals-scope ${signalsScopeOk ? "PASS" : "FAIL"}` +
+      `signals-scope ${signalsScopeOk ? "PASS" : "FAIL"} · ` +
+      `leakage-scope ${leakageScopeOk ? "PASS" : "FAIL"} · ` +
+      `map-scope ${mapScopeOk ? "PASS" : "FAIL"}` +
       (failures.length ? `\n  failures: ${failures.join(", ")}` : ""),
   );
 
@@ -207,4 +285,11 @@ test("tripwire: responsive layout (55) + rep scope (command + pipeline + signals
   expect(signalsScopeOk, "rep signals queue must show only SE-1 cards").toBe(
     true,
   );
+  expect(leakageScopeOk, "rep heat table must hold only her own rows").toBe(
+    true,
+  );
+  expect(
+    mapScopeOk,
+    "rep map must carry no foreign-territory dollar values",
+  ).toBe(true);
 });

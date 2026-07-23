@@ -14,7 +14,8 @@
                 "open",
                 "assigned",
                 "actioned",
-                "dismissed"
+                "dismissed",
+                "expired"
               ]
             }
           }

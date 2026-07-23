@@ -5,12 +5,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "./api";
+import { FETCH_LIMIT as LIMIT, q } from "./fetchAll";
 import type { AssigneeRow, Page, SignalRow, SignalsSummary } from "./types";
 
-const LIMIT = 200;
-const q = encodeURIComponent;
-
-export type QueueFilter = "active" | "actioned" | "dismissed";
+/** P5 (R4): the queue's status filter gains the machine-retired shelf. */
+export type QueueFilter = "active" | "actioned" | "dismissed" | "expired";
 
 export function useSignals(status: QueueFilter) {
   return useQuery({

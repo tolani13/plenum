@@ -48,7 +48,11 @@ export function Command() {
   );
 
   return (
-    <div className="mx-auto max-w-[1600px]">
+    // R8 (P5): at generous viewport heights the KPI row + Territory Board
+    // DISTRIBUTE the column instead of leaving a dead void under the board —
+    // flex stretch only (no fixed pixel heights), and only when the height
+    // is actually there (≥900px), so laptop/tablet landscape is untouched.
+    <div className="mx-auto max-w-[1600px] [@media(min-height:900px)]:flex [@media(min-height:900px)]:min-h-[calc(100dvh-2.5rem)] [@media(min-height:900px)]:flex-col">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="nameplate-strong text-xl text-text">Command</h1>
@@ -74,27 +78,29 @@ export function Command() {
         )}
       </div>
 
-      {territories.isSuccess ? (
-        rows.length === 0 ? (
-          <div className="rounded-lg border border-seam bg-surface p-6 text-xs text-text-dim">
-            No territory activity in scope for this year.
-          </div>
-        ) : (
-          <TerritoryBoard
-            rows={rows}
-            basis={basis}
-            signalCounts={signalCounts}
-            onSelect={setSelected}
+      <div className="[@media(min-height:900px)]:min-h-0 [@media(min-height:900px)]:flex-1">
+        {territories.isSuccess ? (
+          rows.length === 0 ? (
+            <div className="rounded-lg border border-seam bg-surface p-6 text-xs text-text-dim">
+              No territory activity in scope for this year.
+            </div>
+          ) : (
+            <TerritoryBoard
+              rows={rows}
+              basis={basis}
+              signalCounts={signalCounts}
+              onSelect={setSelected}
+            />
+          )
+        ) : territories.isError ? (
+          <ErrorPanel
+            onRetry={() => territories.refetch()}
+            message="Couldn’t load the Territory Board."
           />
-        )
-      ) : territories.isError ? (
-        <ErrorPanel
-          onRetry={() => territories.refetch()}
-          message="Couldn’t load the Territory Board."
-        />
-      ) : (
-        <LoadingPanel label="Loading Territory Board" />
-      )}
+        ) : (
+          <LoadingPanel label="Loading Territory Board" />
+        )}
+      </div>
 
       {selected && (
         <DrillDrawer

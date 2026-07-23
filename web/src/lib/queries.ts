@@ -6,19 +6,20 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "./api";
+import { FETCH_LIMIT as LIMIT, q } from "./fetchAll";
 import type {
   CoverageRow,
   CustomerRow,
+  DataQualityBody,
   DefectionRow,
   ItemRow,
   LeaderboardRow,
+  LeakagePage,
   Page,
+  StatesPage,
   TerritoryRow,
 } from "./types";
 import type { Group, Kind } from "./params";
-
-const LIMIT = 200;
-const q = encodeURIComponent;
 
 export function useTerritories(period: string) {
   return useQuery({
@@ -75,5 +76,41 @@ export function useCustomers(period: string, kind: Kind) {
       apiGet<Page<CustomerRow>>(
         `/api/metrics/customers?period=${q(period)}&basis=net&kind=${kind}&limit=${LIMIT}`,
       ),
+  });
+}
+
+// ── P5 additions ────────────────────────────────────────────────────────────
+
+/** The Leakage screen's one fetch: distribution + heat follow period/kind;
+ *  the outlier zone rides `outliers=policy` — the discount_anomaly
+ *  generator's exact math, so feed rows and signal chips agree 1:1 (R1). */
+export function useLeakage(period: string, kind: Kind) {
+  return useQuery({
+    queryKey: ["metrics", "leakage", period, kind],
+    queryFn: () =>
+      apiGet<LeakagePage>(
+        `/api/metrics/leakage?period=${q(period)}&kind=${kind}&outliers=policy&limit=${LIMIT}`,
+      ),
+  });
+}
+
+/** Per-state money + the territory roster/coloring config (R3). Dual-basis
+ *  payload — basis stays a client display choice, exactly like every other
+ *  metrics hook. */
+export function useStates(period: string) {
+  return useQuery({
+    queryKey: ["metrics", "states", period],
+    queryFn: () =>
+      apiGet<StatesPage>(
+        `/api/metrics/states?period=${q(period)}&basis=net&limit=${LIMIT}`,
+      ),
+  });
+}
+
+/** The R2 finders — read-only, RLS-scoped mess census. */
+export function useDataQuality() {
+  return useQuery({
+    queryKey: ["data-quality"],
+    queryFn: () => apiGet<DataQualityBody>(`/api/data-quality`),
   });
 }

@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ol.id AS \"order_line_id!\", o.id AS \"order_id!\",\n                  o.ordered_on AS \"ordered_on!\",\n                  a.id AS \"account_id!\", a.name AS \"account_name!\",\n                  t.code AS \"territory_code!\",\n                  p.sku AS \"product_sku!\", ol.qty AS \"qty!\",\n                  ol.list_unit_cents AS \"list_unit_cents!\"\n           FROM order_lines ol\n           JOIN orders o ON o.id = ol.order_id\n           JOIN accounts a ON a.id = o.account_id\n           JOIN territories t ON t.id = a.territory_id\n           JOIN products p ON p.id = ol.product_id\n           WHERE ol.discount_pct = 100\n           ORDER BY o.ordered_on, ol.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "order_line_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "order_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "ordered_on!",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 3,
+        "name": "account_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "account_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "product_sku!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "qty!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "list_unit_cents!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "13320eed8c4fda3908d0bba27aef366ab0dbbb18c4aa53eb3cea2dbd8e82a239"
+}

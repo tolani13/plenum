@@ -4,6 +4,226 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-22 · P5 Polish + demo hardening + Territory Map (FINAL phase)
+
+- **Unit:** P5 (Territory Map screen over a committed public-domain SVG,
+  Leakage screen, Data Quality panel, signal auto-expiry, perf indexes +
+  lane pagination + bundle split + states pass, + New account, param/LIMIT
+  dedups, run-all/demo-reset scripts, PRODUCTION.md, README rewrite,
+  tripwire 70+5) — branch `p5-polish-map` from main `8bfe7c7`. Tier 3,
+  one-and-done. Repo LOCAL-ONLY.
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+- **Spec amendment recorded (D.'s order, 2026-07-22):** §12's "geographic
+  map data" anti-goal is AMENDED — a static, public-domain,
+  committed-to-repo map graphic is IN scope. Still banned: map tile
+  services, geocoding APIs, runtime map fetches, geo libraries, any network
+  dependency for the map. Honored: the asset is committed CC0 SVG, rendered
+  as typed inline React paths, zero libraries, zero fetches.
+- **Architect rulings recorded (R1–R13, dispositions inline):**
+  - **R1 — Leakage screen (/leakage, rail between Leaderboards and
+    Pipeline).** Shipped: distribution bar (recharts, tokens-only), outlier
+    feed, rep × family heat table (CSS grid, five NEW heat tokens extending
+    the P2 LED-band logic, alarm hue reserved for the worst band, row order
+    leakage% DESC so Wes Turner reads worst at VP — test-pinned
+    server-side). σ ALIGNMENT: /metrics/leakage's hardcoded `2` now reads
+    signal_policy.discount_sigma — byte-identical at the 2.00 default,
+    PROVEN by SHA-256 equality on three fixed requests projected onto the
+    original 13-field contract (before == after, pasted in the report).
+    WINDOW ALIGNMENT resolved via a DISCLOSED mode param (`outliers=policy`,
+    default `period` = P1 behavior verbatim): the ruling's byte-identical
+    requirement and its window-alignment clause could not BOTH hold on one
+    path (the P1 feed is period-sliced stddev_samp; the generator is
+    all-history stddev_pop over the trailing window), so the legacy path
+    stays byte-identical and the SCREEN's outlier zone requests the policy
+    path — the generator's math verbatim, rows matching the
+    discount_anomaly signals 1:1 (172/172 on build day, chip join by
+    order_line under the caller's RLS). Disclosed payload additions (P3
+    precedent): outlier rows gain order_line_id / account_id /
+    territory_code / signal_id / signal_status; LeakagePage gains `heat`
+    cells (rep × family gross/net).
+  - **R2 — Data Quality (/data-quality, last rail entry).** Shipped
+    read-only: (a) duplicate-ish names via pure-SQL normalization (lower →
+    strip punctuation → drop legal-suffix words → strip one trailing plural
+    's' per word → join; no pg_trgm, no extension) — catches BOTH planted
+    pairs incl. the plural "Keystone Coatings" / "Keystone Coating Co."
+    case, never the legitimate parent/child; (b) cartridge-bearing units
+    with NULL expected_changeout_months (the 360's CADENCE UNKNOWN chip
+    predicate); (c) 100%-discount lines; (d) zero-site accounts (disclosed
+    cheap addition, designed-empty on the seed). VP census exact
+    (2 pairs / 2 units / 1 line / 0), serena's scope = the designed "clean
+    book" empty state — both test-pinned. Scope chip states the
+    only-complete-at-VP truth. New disclosed endpoint GET /api/data-quality
+    (RLS-scoped naturally).
+  - **R3 — Territory Map (/map, rail directly after Command).** Shipped.
+    Asset: "Blank US Map (states only).svg" by Heitordp, Wikimedia Commons,
+    **CC0 1.0 public domain** — committed byte-verbatim plus a provenance
+    comment header at web/src/map/blank-us-map-states-only.svg; rendered
+    via the derived typed module web/src/map/usStates.ts (51 paths with
+    USPS codes + names, AK/HI inset separators, the DC callout circle).
+    Migration 0013 seeds `territory_states` along US Census division lines
+    (50 states + DC across the six US territories; CA-E/CA-W block codes +
+    all provinces/territories for site-state dollar attribution), SELECT
+    grant, NOT in the seed truncate list. DELIBERATE DEVIATION, disclosed:
+    keyed by territory CODE with no FK — the seed wipe is `TRUNCATE
+    territories … CASCADE`, and an FK would cascade-wipe this config on
+    every reseed, defeating the same ruling's survives-reseed requirement;
+    codes are unique and stable (the P4 tile-match precedent), so the
+    code join is equivalent. PRE-2 VERDICT: **100.00% alignment in all 8
+    territories** (the seed's city pools were territory-regional all
+    along) → per-state dollars SHIPPED on hover, seed UNTOUCHED — the R3
+    first-preference path never needed. Disclosed endpoint GET
+    /api/metrics/states: per-state gross/net/leakage/order_count (metrics
+    grammar, dual-basis, RLS-scoped — rep rows = own-territory states only,
+    summing exactly to her territory total; adversarial-tested) + the
+    config-level `territories` roster (TM = assigned reps, RM = their
+    managers, mapped state codes — org chart + geography are config, the
+    P4 assignees precedent; money is what scope guards). UI: ocean +
+    token-colored graticule + eight NEW desaturated territory-fill tokens
+    (alarm/amber never fills; flow blue reserved for selection glow),
+    seam strokes, abbr labels (bbox-measured; tiny Atlantic states get an
+    east leader-line column that drops below 768 — tooltip carries them),
+    Canada as two chamfered schematic blocks above the continent (negative
+    viewBox band, in-scope money line on the block), click → territory
+    panel (nameplate, TERRITORY MANAGER, REGIONAL MANAGER via the manager
+    chain, gross/net/leakage/leakage%/attainment/orders from the EXISTING
+    territories metric — no new rollups), global basis toggle flips every
+    dollar at once, rep view = own territory lit / foreign territories
+    dimmed silhouettes with NO dollar values anywhere in the DOM (hover
+    included; tripwire-asserted). Period fixed to Command's YTD so panel
+    totals match Command tiles by construction (and Leaderboards at 2026).
+    The drill-drawer jump link was OMITTED per the ruling's "if cheap"
+    clause — the drawer is Command-internal state, not URL-addressable.
+  - **R4 — Signal auto-expiry.** 0013: `signal_status` gains 'expired'
+    (additive ALTER TYPE), signals gains nullable expired_at;
+    generate_signals() re-created (DROP + CREATE — the return table gains
+    the per-type `expired` count, and a return-shape change cannot ride
+    CREATE OR REPLACE; grants re-issued) with a per-generator expiry step:
+    open + machine-keyed + this type + dedupe_key NOT in the run's emitted
+    key set → status='expired', expired_at=now(). assigned/actioned/
+    dismissed NEVER touched. DISCLOSED completion: reopen-on-return — the
+    upsert's conflict arm now also revives an 'expired' row whose key is
+    re-emitted (status back to open, expired_at cleared, fresh
+    score/reasons, counted in `updated`): expired is machine state, and
+    without reopen a recovered-then-degraded unit could never alarm again
+    (acceptance check 8 would be unrehearsable). Dismissed/actioned still
+    never resurrect (P4 test untouched, green). Idempotency held: same-day
+    double run = 0/0/0 per type with ZERO audit delta (proven twice —
+    psql and the HTTP matrix). Expiries/reopens are real state changes:
+    the 0006 trigger audits each (counts in the report). Write-backs on an
+    expired card = typed 422 ("the generator reopens it if its predicate
+    returns"). UI: Active definition unchanged (open ∪ assigned); the
+    queue filter gains Expired; summary/tiles exclude expired by
+    construction. Full adversarial matrix in tests/p5_http.rs.
+  - **R5 — Perf indexes (follow the plans, not guesses).** PRE-4 EXPLAIN
+    ANALYZE found the real culprit: v_unit_facts' last_paid lateral was
+    seq-scanning `orders` per unit (no index leads with site_id), inflating
+    the enriched-list plan cost to ~517k — past the JIT thresholds, so
+    1,021 ms of the 1,187 ms was JIT compilation. ONE measured index —
+    `idx_orders_site_ordered ON orders (site_id, ordered_on DESC, id
+    DESC)` — plus a seed post-load ANALYZE (planner stats are stale after
+    truncate-reload until autovacuum; disclosed load-path addition, touches
+    no data, moves no anchor). AFTER: enriched active list 1,187.3 →
+    **25.4 ms** (plan cost 18,985, JIT gone); generate_signals() 2,876 /
+    2,649 → **72 ms**; v_unit_facts census 219 → 19 ms. The unit prompt's
+    candidates were measured moot: signals(status,type) has existed since
+    0003, and the signals table is ~250 rows.
+  - **R6 — Lane pagination.** Each queue lane renders 25 cards + "Show 25
+    more · N below" (client-side slice, no library; testids preserved;
+    filter change resets). The tripwire expands every lane before its
+    signals-scope count — exercising the control on every run.
+  - **R7 — Bundle split.** React.lazy + Suspense (house LoadingPanel) for
+    Ask + Territory Map + Leakage + Data Quality; ASK_FOCUS_EVENT moved to
+    lib/events.ts so the Shell stops importing from Ask's chunk. Main
+    chunk **773.63 kB → 423.29 kB** (no Vite warning); recharts isolated
+    in a shared on-demand chunk (352.15 kB) reached only from Ask/Leakage;
+    the map geometry rides its own 55 kB chunk.
+  - **R8 — States pass.** Inventory table in the session report (14
+    screens × loading/empty/error). The three new screens ship designed
+    loading (house pulse), designed empty ("Click a state…", "clean book",
+    "No lines beat the policy threshold…"), and typed-error ErrorPanel +
+    Retry. Command vertical rhythm: height-gated flex distribution
+    (≥900px viewports only; min-height via dvh calc + flex-1 + auto-rows-fr
+    + an in-tile spacer — zero fixed pixel heights), untouched below.
+  - **R9 — Small owed.** (a) "+ New account" in the shell for ALL roles →
+    house-pattern modal; territory options = the config roster filtered to
+    the CALLER'S scope; the server stays the validator (blank name →
+    typed 422 "name is required" rendered inline — proven live); success
+    navigates to the new /accounts/:id. (b) accounts.rs + metrics.rs
+    dropped their P0/P1-era local parse_int/parse_page copies for
+    routes/common.rs — identical grammar and 422 messages, full suite
+    green. (c) web LIMIT/encode idiom unified in lib/fetchAll.ts
+    (FETCH_LIMIT + q), consumed by queries/signals/crm hooks — tsc strict
+    + tripwire green.
+  - **R10 — PRODUCTION.md** committed verbatim at the repo root;
+    placeholders filled: crates/seed/src/main.rs (importer seam),
+    crates/api/src/routes/telemetry.rs (telemetry template).
+  - **R11 — README rewrite** (audition frame · 3-command quickstart ·
+    login table · one-line demo reset · §13 script verbatim with beat 2's
+    customers-tab line and beat 6 in BOTH live and flags-off forms ·
+    map-asset license note · known-behaviors appendix · troubleshooting).
+    scripts/run-all.ps1 starts API + web in their own windows and — fresh
+    clone only — materializes the dev .env first (values already committed
+    in docker-compose.yml/initdb; COOKIE_SECURE=false so plain-HTTP
+    localhost logins work; AI key left empty): without this the cookie
+    posture is a hidden fourth command and gate P5-1 fails.
+    scripts/demo-reset.ps1 = the reseed one-liner (re-login note printed).
+  - **R12 — Tripwire 70 + 5.** 14 screens (adds /map, /leakage,
+    /data-quality) × 5 widths, plus leakage-scope (rep heat table = her
+    rows only, DOM set == API set) and map-scope (no '$' inside any
+    foreign-territory DOM element; ≥53 shapes drawn) alongside the P2–P4
+    command/pipeline/signals assertions.
+  - **R13 — master-plan repairs** applied: both stale owed-walk passages
+    replaced with the 8bfe7c7 acceptance-record wording (current bytes
+    verified against git show 8bfe7c7 before editing — they matched the
+    unit's quotes).
+- **Shipped:** migrations/0013_territory_map_expiry.sql (territory_states
+  seeded config · 'expired' + expired_at · idx_orders_site_ordered ·
+  generate_signals v2 with per-type expired count + reopen);
+  crates/api/src/routes/{states,data_quality}.rs (new) + metrics.rs (R1) +
+  signals.rs (expired surface) + accounts.rs/common.rs (R9b) + mod.rs;
+  crates/domain enums (Expired); crates/seed/src/main.rs (expired column +
+  post-load ANALYZE); crates/api/tests/p5_http.rs (4 adversarial tests) +
+  signals_http.rs extended to expired; .sqlx regenerated; web:
+  map/{blank-us-map-states-only.svg,usStates.ts,UsMap.tsx,TerritoryMap.tsx},
+  leakage/Leakage.tsx, dq/DataQuality.tsx, shell/NewAccountDialog.tsx,
+  lib/{fetchAll,events}.ts + types/queries/signals/crm updates, Signals
+  lanes + Expired filter, Shell nav + New account, App lazy routes,
+  tokens.css (8 territory fills · ocean/graticule/land-dim · 5 heat bands),
+  Command/TerritoryBoard/Tile rhythm, tripwire.spec.ts 70+5;
+  scripts/{run-all,demo-reset}.ps1; PRODUCTION.md; README rewrite; this
+  log; master-plan; CLAUDE.md.
+- **Checks status (outputs in the session report):** PRE-1…PRE-6 PASS
+  (two seed runs byte-identical on every frozen anchor; PRE-2 = 100.00%
+  × 8; PRE-3 captures + PRE-4 baselines + PRE-5 chunk table + PRE-6
+  env/no-key-material/login-table). scripts/check.sh ALL CHECKS PASSED —
+  60 tests (12 domain + 7 validator + 22 prior HTTP + 8 signals_http +
+  7 ai_http + 4 p5_http), fmt/clippy -D warnings/sqlx prepare --check
+  clean. R1 equivalence: SHA-256(before) == SHA-256(after) on all three
+  fixed requests. Tripwire **70/70 layout + 5 scope PASS**. npm run build
+  clean, main 423.29 kB. Perf before/after pasted. Browser-driven internal
+  walk: map GA-click → SE-1 panel (Serena Estes / Rachel Moore / YTD
+  money), leakage 172 outliers with 172 chips + Wes-first heat, DQ trio
+  exact, + New account blank-name 422 inline.
+- **Anchors:** frozen set unchanged and re-proven twice post-0013 (orders
+  17353/11556020473 · order_lines 25497/−166812187229 · opportunities
+  16/3367519569 · quotes 1/lines 3 · mv 120/195/1699/614 · audit_log 17 at
+  seed print · ledger/customers CUM NET 2467089087 = $24,670,890.87 ·
+  serena 293778300/278301715 · Wes quote pending 13158000/9698040 @28%).
+  PRE-2 verdict 100.00% → the state-dollar path shipped with ZERO seed
+  change. CLOCK-DRIFTING (recompute, never pin): signal counts — build-day
+  (2026-07-22) 39/12/28/172 = 251.
+- **New dependencies: NONE.** Zero npm packages, zero crates. The one new
+  asset: "Blank US Map (states only).svg" (Heitordp, Wikimedia Commons,
+  CC0 1.0 Universal Public Domain Dedication) committed with a provenance
+  header + license note in README; derived usStates.ts carries the same
+  attribution.
+- **Phase gate: PENDING** — D.'s 14-check acceptance walk (commands
+  supplied single-line in the session report). Build reported complete on
+  internal proof only; the gate is D.'s hands + eyes.
+- **Commit:** built across `p5-polish-map` (`e8e88aa` schema+seed →
+  `3766d7d` API → `5b64c02` tests → web/tripwire → scripts+docs; final
+  list in the session report).
+
 ## 2026-07-20 · P4 Signals + AI
 
 - **Unit:** P4 (four deterministic signal generators + queue with write-backs,

@@ -1,0 +1,124 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH sp AS (SELECT * FROM signal_policy),\n               fam_stats AS (\n                   SELECT family,\n                          percentile_cont(0.5) WITHIN GROUP\n                              (ORDER BY discount_pct::float8) AS median_pct,\n                          stddev_pop(discount_pct::float8) AS sd\n                   FROM v_order_facts\n                   GROUP BY family\n               )\n               SELECT f.order_id AS \"order_id!\",\n                      f.order_line_id AS \"order_line_id!\",\n                      f.account_id AS \"account_id!\",\n                      f.territory_code AS \"territory_code!\",\n                      f.ordered_on AS \"ordered_on!\",\n                      f.account_name AS \"account_name!\",\n                      f.rep_name AS \"rep_name!\",\n                      f.product_sku AS \"product_sku!\",\n                      f.product_name AS \"product_name!\",\n                      f.family AS \"family!\",\n                      f.qty AS \"qty!\",\n                      f.list_unit_cents AS \"list_unit_cents!\",\n                      f.net_unit_cents AS \"net_unit_cents!\",\n                      f.discount_pct::float8 AS \"discount_pct!\",\n                      s.median_pct AS \"family_median_pct!\",\n                      (s.median_pct + sp.discount_sigma * s.sd) AS \"threshold_pct!\",\n                      sig.id AS \"signal_id?\",\n                      sig.status::text AS \"signal_status?\"\n               FROM v_order_facts f\n               JOIN fam_stats s ON s.family = f.family\n               CROSS JOIN sp\n               LEFT JOIN signals sig\n                      ON sig.order_line_id = f.order_line_id\n                     AND sig.type = 'discount_anomaly'\n               WHERE f.ordered_on >= CURRENT_DATE - sp.discount_window_days\n                 AND s.sd > 0\n                 AND f.discount_pct::float8 > s.median_pct + sp.discount_sigma * s.sd\n               ORDER BY f.discount_pct DESC, f.order_line_id\n               LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "order_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "order_line_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "account_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "territory_code!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "ordered_on!",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 5,
+        "name": "account_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "rep_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "product_sku!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "product_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "family!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "qty!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "list_unit_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 12,
+        "name": "net_unit_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 13,
+        "name": "discount_pct!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 14,
+        "name": "family_median_pct!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 15,
+        "name": "threshold_pct!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 16,
+        "name": "signal_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 17,
+        "name": "signal_status?",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      null,
+      null,
+      null,
+      false,
+      null
+    ]
+  },
+  "hash": "a1eb2f1f4d8399c7dbd5001d135a49a446509a01c4126448beb9d3c65a81a153"
+}

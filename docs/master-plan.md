@@ -2,7 +2,63 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-20 — P4 Signals + AI: built, merged 2026-07-21
+## [LATEST] 2026-07-22 — P5 Polish + demo hardening + Territory Map: built
+- FINAL phase, on `p5-polish-map` from main 8bfe7c7. Shipped surface: the
+  Territory Map (/map — the Board projected on the continent: committed CC0
+  US-states SVG rendered as typed React paths, territory_states geography
+  config seeded in migration 0013 along Census division lines, per-state
+  dollars on hover per the PRE-2 verdict, click-through territory panel
+  with TM/RM staffing + board figures, global basis flip, rep view =
+  dimmed foreign silhouettes with zero foreign dollars in the DOM);
+  Leakage (/leakage — distribution bar, the outlier feed running the
+  discount_anomaly generator's exact math via the disclosed
+  `outliers=policy` mode so rows and signal chips agree 1:1, and the rep ×
+  family heat table banded by NEW heat tokens with Wes Turner reading
+  worst at VP); Data Quality (/data-quality — pure-SQL finders landing
+  exactly on the seeded trio at VP view, "clean book" designed empty in a
+  rep's scope); signal auto-expiry (0013: 'expired' status + expired_at;
+  generate_signals() re-created with a per-type expiry step + expired
+  count + reopen-on-return; humans never machine-touched; same-day double
+  run stays 0/0/0 with zero audit delta); perf (ONE measured index —
+  orders(site_id, ordered_on DESC, id DESC) — plus a seed post-load
+  ANALYZE: enriched list 1,187→25 ms, generate_signals 2,876→72 ms); lane
+  pagination (25 + show-more); bundle split (main 773.63→423.29 kB, no
+  Vite warning); states pass + Command tall-viewport rhythm; + New
+  account modal (server-validated, typed 422 inline); param/LIMIT dedups;
+  scripts/run-all.ps1 (+ fresh-clone dev-.env materialization) +
+  scripts/demo-reset.ps1; PRODUCTION.md verbatim; README rewritten around
+  the 3-command quickstart + §13 script; /api/metrics/states +
+  /api/data-quality (disclosed, RLS-scoped, adversarial-tested).
+- Rulings digest: R1 σ-from-config byte-identical (SHA-proven) + policy
+  outlier mode + disclosed payload additions · R2 finders, no extensions ·
+  R3 CC0 asset + code-keyed territory_states (FK would cascade-wipe on
+  reseed) + roster disclosure + drawer-link omitted per "if cheap" · R4
+  expiry + disclosed reopen-on-return (check 8 rehearsable) · R5
+  measured index (prompt candidates moot) · R6 lane slices · R7 lazy
+  routes · R8 states inventory + height-gated rhythm · R9 owed trio ·
+  R10 PRODUCTION.md · R11 README/scripts · R12 tripwire 70+5 · R13 the
+  repairs below.
+- Verification: Tier 3. check.sh ALL CHECKS PASSED (60 tests = 56 prior
+  untouched + 4 p5_http: expiry matrix, states scope + roster + grammar,
+  R1 equivalence + policy parity + Wes-worst pin, data-quality trio);
+  PRE-1…6 pasted; two seed runs byte-identical INCLUDING post-0013;
+  tripwire 70/70 + 5 scope PASS; npm build clean; perf before/after
+  pasted; browser-driven internal walk (map panel, leakage chips, DQ
+  trio, new-account 422).
+- Anchors: frozen set unchanged (orders 17353/11556020473 · order_lines
+  25497/−166812187229 · opportunities 16/3367519569 · mv 120/195/1699/614
+  · audit 17 at seed · $24,670,890.87 · serena 293778300/278301715 · Wes
+  28% quote 13158000/9698040). PRE-2: 100.00% alignment × 8 territories →
+  per-state dollars shipped, seed untouched. Signal counts clock-drifting
+  (build-day 39/12/28/172 = 251).
+- New dependencies: NONE (zero npm, zero crates). New asset: Blank US Map
+  (states only).svg — Heitordp, Wikimedia Commons, CC0 1.0 — committed
+  with provenance header.
+- Status: built + internally proven; PENDING D.'s 14-check acceptance
+  walk (commands in the session report); merge pending D.'s literal
+  "merge" (pre-authorized PHASE 2).
+
+## 2026-07-20 — P4 Signals + AI: built, merged 2026-07-21
 - Shipped surface: signals become REAL — four deterministic generators
   (reorder_due incl. a telemetry branch, defection_risk from metric 7's view
   verbatim, conquest via the filter_fits cross-reference, discount_anomaly
@@ -53,11 +109,12 @@ Product-level plan. All phase units reference this file and the spec
   (build-day: 38/12/28/173 = 251; audit_log +251 after first generation).
 - New dependencies (pre-authorized): reqwest 0.12.28 (MIT/Apache-2.0),
   sqlparser 0.62.0 (Apache-2.0). recharts finally in use.
-- Accepted + merged: D.'s literal "merge" reply 2026-07-21 (merge = approval
-  per the unit's pre-authorized PHASE 2; no in-session per-check walk — the
-  12-check observation pass stays owed to D.'s own hands, recorded in the
-  HANDOFF-LOG entry); merge commit 56cdd9b (--no-ff). Repo remains
-  local-only; branch p4-signals-ai kept.
+- Accepted + merged 2026-07-21 on D.'s literal "merge" (per the unit's
+  pre-authorized PHASE 2). The 12-check walk ran the same evening in the
+  Cowork session, 12/12 PASS, recorded in the HANDOFF-LOG acceptance
+  record (8bfe7c7) — superseding this block's earlier owed-walk wording.
+  Merge commit 56cdd9b (--no-ff). Repo remains local-only; branch
+  p4-signals-ai kept.
 
 ## 2026-07-20 — P3 CRM operational core: built, accepted, merged
 - Shipped surface (branch p3-crm-core): the whole operational loop, all
@@ -185,12 +242,14 @@ Product-level plan. All phase units reference this file and the spec
 - P3 CRM operational core — DONE (this entry): Account 360 + installed-base
   timeline, pipeline kanban with Won-books-order, quote builder + approval
   state machine + audit UI, activities.
-- P4 Signals + AI — DONE (this entry): generators + queue with write-backs,
-  Command rewire, Ask PLENUM + recommender behind flags, telemetry stub.
-  Merged 56cdd9b on D.'s "merge" 2026-07-21; the 12-check observation walk
-  stays owed to D.'s hands.
-- P5 Polish + demo hardening — leakage screen, data-quality panel,
-  states pass, README demo script.
+- P4 Signals + AI — DONE: generators + queue with write-backs, Command
+  rewire, Ask PLENUM + recommender behind flags, telemetry stub. Merged
+  56cdd9b on D.'s "merge" 2026-07-21; 12-check walk 12/12 PASS same
+  evening (HANDOFF-LOG record, 8bfe7c7).
+- P5 Polish + demo hardening + Territory Map — DONE (this entry): map +
+  leakage screen + data-quality panel + signal auto-expiry + perf/bundle/
+  states pass + quickstart scripts + PRODUCTION.md + tripwire 70+5. Built
+  on p5-polish-map; pending D.'s 14-check acceptance walk + "merge".
 
 ## Standing constraints (spec §4/§7 shortlist)
 BIGINT cents · timestamptz · RLS in Postgres never app code · typed
@@ -211,4 +270,8 @@ report by walking acceptance checks, never internal tests alone.
 - 2026-07-20 — P4 built on p4-signals-ai (migration 0012 + generate_signals,
   signals surface, ai/ seam + validator, telemetry stub, queue/Ask/Command
   rewire, tripwire 55+3).
-- 2026-07-21 — P4 merged 56cdd9b on D.'s "merge" (observation walk owed).
+- 2026-07-21 — P4 merged 56cdd9b on D.'s "merge"; the 12-check walk ran the
+  same evening, 12/12 PASS (acceptance record 8bfe7c7).
+- 2026-07-22 — P5 built on p5-polish-map (migration 0013, Territory Map +
+  Leakage + Data Quality, auto-expiry, perf/bundle, scripts + PRODUCTION.md
+  + README, tripwire 70+5). Pending D.'s walk + merge.

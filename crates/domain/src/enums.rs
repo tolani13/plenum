@@ -75,6 +75,11 @@ pub enum SignalStatus {
     Assigned,
     Actioned,
     Dismissed,
+    /// P5 (R4): the generator's predicate stopped holding while the card was
+    /// still open — the machine takes back what the machine issued. Never
+    /// applied to assigned/actioned/dismissed rows; reopened by the generator
+    /// if the predicate returns.
+    Expired,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]

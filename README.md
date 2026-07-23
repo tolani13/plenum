@@ -1,355 +1,145 @@
 # PLENUM
 
-CRM for the installed-base business — Camfil APC audition artifact.
-Source of truth: [docs/plenum-crm-01.md](docs/plenum-crm-01.md) (spec v01).
+PLENUM is a CRM built for the installed-base business — every screen answers
+"what does the installed base owe us next?", every money figure exists as
+gross AND net, and every AI output carries its receipts. It was built as the
+audition artifact for the AI Sales & Solutions Architect role at Camfil APC:
+synthetic data on purpose, production-shaped architecture on purpose (see
+[PRODUCTION.md](PRODUCTION.md) for the honest map from demo to deployment).
+Source of truth: [docs/plenum-crm-01.md](docs/plenum-crm-01.md) (spec v01);
+build history: [docs/HANDOFF-LOG.md](docs/HANDOFF-LOG.md).
 
-**Phase state: P0 and P1 merged to main. P2 (Command + Leaderboards UI)
-built on `p2-command-ui`, pending D.'s acceptance. P3+ not started.**
-P2 adds the `web/` React app — login, app shell, the Territory Board
-(Command), and the reps/items/customers Leaderboards with period/basis/kind
-controls and CSV export — served by a Vite dev server that proxies to the
-API. See **Run the UI (P2)** below. No backend change (P2 is UI only).
-P0 = repo scaffold, Postgres schema + Row-Level Security + audit triggers,
-deterministic seed engine, session auth, RLS session middleware, `GET
-/api/accounts`. P1 = the derived analytics layer (`v_order_facts` +
-`v_unit_facts`, four materialized rollups + scoped read views) and the seven
-metric endpoint groups under `/api/metrics/*`, dual-basis (gross/net) in
-every payload, plus `POST /api/admin/refresh-rollups` (admin-only). The
-seed now refreshes the rollups after loading and prints one row-count line
-per materialized view. No UI (that is P2).
-
----
+**Phase state: P0–P4 merged; P5 (polish + Territory Map + Leakage +
+Data Quality + signal auto-expiry) built on `p5-polish-map`.**
 
 ## Prerequisites
 
 - Docker Desktop (running)
 - Rust ≥ 1.80 (`rust-toolchain.toml` pins 1.95.0)
+- Node 20+ / npm (for the web app)
 
-## Ports on this machine
-
-- **Database: host port 5434** → container 5432. This machine's native
-  PostgreSQL services own 5432/5433, so compose maps 5434 (D.'s call,
-  2026-07-17). Every `docker compose exec db psql …` command runs *inside*
-  the container and is unaffected. Only the connection strings in `.env`
-  carry 5434.
-- **API: 127.0.0.1:5777** (D.'s call, 2026-07-18). PLENUM owns 5777; the
-  Local-Secure-Ops bank demo (`stack-ledger-api.exe`, another agent's active
-  project) keeps 8080 — no contention, the two run side by side. The
-  never-touch rule for other agents' processes and folders still stands:
-  PLENUM sessions never stop or modify the bank demo, ever. Loopback bind
-  by default — the demo API is not exposed off-machine.
-
-## Run it (three commands)
-
-```
-docker compose up -d
-cargo run --bin seed
-cargo run --bin api
-```
-
-- First `docker compose up` initializes the database and creates the
-  `plenum_app` role (the only role the API ever uses — RLS applies to it).
-- The seed applies migrations (it is the only thing that does), truncates,
-  and regenerates the identical world every run (PRNG seed 20260717). It
-  prints per-entity counts, `ORDERS TOTAL: 17353 (gate: >15000)`, and the
-  login table. Every demo user's password: `demo-plenum-2026`.
-- The API connects only as `plenum_app` and fails fast with a plain-language
-  message if the database is down or unseeded.
-
-Fresh clone note: `.env` is gitignored. Copy `.env.example` → `.env` (the
-dev values are in `docker-compose.yml` / `docker/initdb/01-app-role.sql`).
-Without a `.env`, the binaries fall back to the same dev defaults, except
-the session cookie's `Secure` flag defaults **true** — set
-`COOKIE_SECURE=false` for plain-HTTP localhost or curl will not send the
-cookie back.
-
-## P0 acceptance checks (PowerShell, paste-and-run)
-
-Run in the repo folder. Full walkthrough with expected output lives in the
-P0 handoff report; condensed here.
+## Quickstart — fresh clone to running app in three commands
 
 ```powershell
-# 1 — seed: expect "ORDERS TOTAL: 17353 (gate: >15000)" + a 17-login table
-docker compose up -d
-cargo run --bin seed
-
-# 2 — ask the DB directly (expect the same 17353)
-docker compose exec db psql -U plenum_admin -d plenum -c "SELECT count(*) FROM orders;"
-
-# 3 — start the API (leave running; open a second terminal for 4–6)
-cargo run --bin api
-
-# 4 — RLS breach check FIRST, rep side (expect: SE-1 only, items 6, total 6)
-Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/auth/login -ContentType "application/json" -Body '{"email":"serena.estes@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable rep
-(Invoke-RestMethod -Uri "http://localhost:5777/api/accounts?limit=200" -WebSession $rep).items.territory_code | Sort-Object -Unique
-
-# 5 — VP side (expect all 8 codes: CE-1 CW-1 MT-1 MW-1 NE-1 SC-1 SE-1 W-1)
-Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/auth/login -ContentType "application/json" -Body '{"email":"valerie.price@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable vp
-(Invoke-RestMethod -Uri "http://localhost:5777/api/accounts?limit=200" -WebSession $vp).items.territory_code | Sort-Object -Unique
-
-# 6 — no login, no data (expect HTTP/1.1 401 + JSON error, not a data list)
-curl.exe -i http://localhost:5777/api/accounts
-
-# 7 — survives restart (expect 17353 again, no re-seed)
-docker compose restart
-docker compose exec db psql -U plenum_admin -d plenum -c "SELECT count(*) FROM orders;"
-```
-
-If check 4 shows any code other than `SE-1`: **RLS breach — stop everything
-and report it.**
-
-## P1 acceptance checks (PowerShell, paste-and-run)
-
-Prereqs: DB up, seeded, API running (the three commands above), run in the
-repo folder. Checks 1–2 need a fresh PowerShell window if `$rep`/`$vp`
-don't exist yet.
-
-PLENUM listens on `127.0.0.1:5777`; the bank demo keeps 8080. No port
-contention — the bank demo can stay up, untouched, while these checks run.
-
-```powershell
-# 1 — SCOPE BREACH CHECK FIRST (rep must see exactly one territory)
-Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/auth/login -ContentType "application/json" -Body '{"email":"serena.estes@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable rep
-(Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $rep).items.territory_code
-# EXPECTED: exactly one line: SE-1
-# FAIL LOOKS LIKE: any other code, or more than one line -> scope breach —
-# stop everything and report. (An error message instead = feature broken, different failure.)
-
-# 2 — VP sees all eight
-Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/auth/login -ContentType "application/json" -Body '{"email":"valerie.price@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable vp
-(Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $vp).items.territory_code | Sort-Object
-# EXPECTED: 8 lines: CE-1 CW-1 MT-1 MW-1 NE-1 SC-1 SE-1 W-1
-# FAIL LOOKS LIKE: fewer than 8, or an error.
-
-# 3 — GATE P1-1: the basis toggle re-ranks the top customers (spec §11 verbatim)
-$g = (Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/customers?period=2025&basis=gross&limit=10" -WebSession $vp).items
-$n = (Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/customers?period=2025&basis=net&limit=10" -WebSession $vp).items
-"ORDER DIFFERS: " + (([string]::Join('|',$g.account_name)) -ne ([string]::Join('|',$n.account_name)))
-"ALL GROSS >= NET: " + (@($g + $n | Where-Object { $_.gross_cents -lt $_.net_cents }).Count -eq 0)
-"SAME TOP-10 SET: " + (-not (Compare-Object ($g.account_name | Sort-Object) ($n.account_name | Sort-Object)))
-# EXPECTED: ORDER DIFFERS: True · ALL GROSS >= NET: True · SAME TOP-10 SET: True
-# (Spec expects the same accounts reordered. If SAME TOP-10 SET prints False
-# while ORDER DIFFERS is True, report it — that is the same fact in stronger
-# form, and the auditor rules on it; the hard failures are the other two.)
-# FAIL LOOKS LIKE: ORDER DIFFERS: False (toggle does nothing) or
-# ALL GROSS >= NET: False (a net number exceeds its gross — money math wrong).
-
-# 4 — GATE P1-2: the API's cumulative net equals the raw ledger (spec §11 verbatim)
-$t = (Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/territories?period=cumulative&basis=net&limit=200" -WebSession $vp).items
-"API TOTAL:   " + [int64](($t | Measure-Object -Property net_cents -Sum).Sum)
-docker compose exec db psql -U plenum_admin -d plenum -t -c "SELECT 'LEDGER TOTAL: ' || SUM(net_unit_cents * qty)::bigint FROM order_lines;"
-# EXPECTED: the two numbers are IDENTICAL, digit for digit.
-# FAIL LOOKS LIKE: any difference — the rollup layer is lying about money;
-# that is a stop-and-report, not a rounding footnote.
-
-# 5 — No login, no numbers
-curl.exe -i "http://localhost:5777/api/metrics/leaderboard?period=2025&basis=net"
-# EXPECTED: HTTP/1.1 401 + the same JSON error envelope as P0's check 6 — not data.
-# FAIL LOOKS LIKE: 200 with items, or a crash/stack trace.
-
-# 6 — Garbage in, typed error out  (try/catch form — works on Windows
-#     PowerShell 5.1 AND PowerShell 7)
-try { Invoke-RestMethod -Uri "http://localhost:5777/api/metrics/customers?period=2025&basis=vibes" -WebSession $vp } catch { "STATUS: " + $_.Exception.Response.StatusCode.value__; "BODY: " + $_.ErrorDetails.Message }
-# EXPECTED: STATUS: 422 and a BODY saying basis must be gross|net.
-# FAIL LOOKS LIKE: data comes back (no error at all), or STATUS 500.
-
-# 7 — Refresh is admin-only, and refreshing changes nothing it shouldn't
-try { Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/admin/refresh-rollups -WebSession $rep } catch { "STATUS: " + $_.Exception.Response.StatusCode.value__ }
-# EXPECTED: STATUS: 403 (a rep may not refresh)
-# then log in as the ADMIN from the seed's login table (priya.nair@plenum.demo)
-# and repeat with that session:
-Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/auth/login -ContentType "application/json" -Body '{"email":"priya.nair@plenum.demo","password":"demo-plenum-2026"}' -SessionVariable adm
-Invoke-RestMethod -Method Post -Uri http://localhost:5777/api/admin/refresh-rollups -WebSession $adm | ConvertTo-Json -Depth 4
-# EXPECTED: 200 + per-matview row counts; re-run check 4 -> numbers still IDENTICAL.
-# FAIL LOOKS LIKE: 200 as rep (privilege hole), or check 4 diverging after
-# refresh (rollups drifting from the ledger).
-```
-
-## Run the UI (P2)
-
-The web app (`web/`) is a Vite dev server that proxies `/api` to the API, so
-the browser talks to one origin and the session cookie just works. The API
-stays on `127.0.0.1:5777`; the web page runs on **`127.0.0.1:5177`** (D.'s
-call, 2026-07-19 — port 5173 was held by another program on this machine).
-
-One-time setup (in `web/`):
-
-```
-cd "C:\AI_Projects\Camfil CRM\web"; npm install
-cd "C:\AI_Projects\Camfil CRM\web"; npx playwright install chromium
-```
-
-Then three windows, one line each (PowerShell):
-
-```
-# W1 — database
 cd "C:\AI_Projects\Camfil CRM"; docker compose up -d
-# W2 — API (leave running)
-cd "C:\AI_Projects\Camfil CRM"; cargo run --bin api
-# W3 — web (leave running)
-cd "C:\AI_Projects\Camfil CRM\web"; npm run dev
 ```
 
-Browse to http://127.0.0.1:5177 in Chrome or Edge. Log in with any seeded
-user (password `demo-plenum-2026`); the seed console prints the login table.
-
-For the iPad checks, stop W3 and run `npm run dev:lan` (binds the web page to
-all interfaces; the API stays loopback). Get the PC's address with:
-
-```
-(Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*"} | Select-Object -First 1).IPAddress
+```powershell
+cd "C:\AI_Projects\Camfil CRM"; cargo run --bin seed
 ```
 
-Open `http://THAT-ADDRESS:5177` on the iPad.
-
-## P2 acceptance checks (browser + PowerShell, paste-and-run)
-
-Setup: W1/W2/W3 above running, then browse to http://127.0.0.1:5177.
-
-```
-□ 1. SCOPE FIRST. Log in as serena.estes@plenum.demo / demo-plenum-2026.
-     → EXPECTED: Command loads; the Territory Board shows EXACTLY ONE tile,
-       SE-1 Southeast 1; the user chip says rep · SE-1.
-     FAIL LOOKS LIKE: eight tiles, or any tile that isn't SE-1 — scope
-     breach; stop everything and report. (An error page = different failure.)
-
-□ 2. NO GHOSTS BETWEEN LOGINS. Log out. Log in as
-     valerie.price@plenum.demo (all 8 tiles appear). Log out. Log in as
-     serena.estes@plenum.demo again and WATCH the first paint.
-     → EXPECTED: SE-1's single tile only, from the first visible frame.
-     FAIL LOOKS LIKE: the 8-tile board (or VP-sized numbers) flashing for
-     even a moment before shrinking to SE-1 — cached cross-user data.
-
-□ 3. GATE P2-1, amended by architect ruling 2026-07-19 (HANDOFF-LOG).
-     As the VP on Command: note the big KPI number, any tile's dollar
-     figure, and the coverage projected-$ sub-line. Click GROSS/NET once.
-     → EXPECTED: in one motion, no reload, no white flash: the first KPI
-       flips label (NET YTD ↔ GROSS YTD) and value; EVERY tile's dollar
-       figure changes; coverage projected-$ changes. Rank badges recompute
-       by chosen basis — and at 2026 the ORDER HOLDS, because this year's
-       seeded book carries near-uniform margins across territories (honest
-       reading, not a broken toggle; rank movement is check 3b).
-     FAIL LOOKS LIKE: any dollar figure that does not change, a full
-     refetch/blank flash, or the label not flipping.
-
-□ 3b. Leaderboards → customers → period 2025 → basis GROSS. Note the top-10
-     account names. Switch to NET.
-     → EXPECTED: the order visibly changes AND Vantage Metalworks Coastal
-       (gross top-10, #9) is GONE from the net top-10, with Blue Ridge
-       Fabrication entering. P1-1's proven re-rank, now on screen.
-     FAIL LOOKS LIKE: identical order both ways, or identical top-10
-     membership.
-
-□ 4. DRILL. As the VP, click the SE-1 tile.
-     → EXPECTED: a drawer opens on the right: SE-1's revenue/leakage/
-       attainment/order-count/active-accounts figures, its coverage row
-       (units due, % covered, projected $), and an at-risk unit list that
-       includes RIDGELINE GRAIN near the top. Esc closes it.
-     FAIL LOOKS LIKE: empty drawer, a spinner that never resolves, or no
-     Ridgeline Grain anywhere in SE-1's at-risk list.
-
-□ 5. THE LEAKAGE-REP STORY (amended by architect ruling 2026-07-19).
-     Leaderboards → reps → period CUMULATIVE → basis GROSS.
-     → EXPECTED: the #1 rep (Wes Turner) also shows the WORST (highest)
-       leakage % on the board — volume king, margin floor; the §13 demo
-       line lives here. Sorting by the leakage % column puts that same rep
-       on top. (The seed delivers the beat as "volume leader = worst
-       margin," not a #1 flip — his gross lead survives his discounting;
-       the flip form lives on customers, check 3b.)
-     FAIL LOOKS LIKE: the #1 rep's leakage % mid-pack or blank, or the
-     column unsortable.
-
-□ 6. CONTROLS. Items tab → period 2025-Q3 → kind CONSUMABLE.
-     → EXPECTED: rows are cartridge/filter products; an ATTACH % column
-       shows values; switching kind to CAPITAL empties/dashes ATTACH % and
-       changes the rows and totals. Every control change updates the table
-       without a full page reload, and the URL updates with it.
-     FAIL LOOKS LIKE: attach % on capital rows, controls that do nothing,
-     or a 422/error toast from a control combination the UI itself offered.
-
-□ 7. CSV. Customers tab → CUMULATIVE → NET → Export CSV. Open the file.
-     → EXPECTED: plenum-customers-cumulative-net.csv downloads and opens in
-       Excel; its data row count equals the table's visible row count; the
-       first data row is the same account as the table's #1 row. Repeat
-       once logged in as serena: the file's rows are SE-1 accounts only,
-       matching her on-screen table exactly.
-     FAIL LOOKS LIKE: garbled columns in Excel, row counts that don't
-     match the screen, or the rep's file containing accounts her screen
-     doesn't show (scope leak in export — stop and report).
-
-□ 8. THE LEDGER ANCHOR. Still customers + CUMULATIVE + NET (as VP): read
-     the footer total of the NET column.
-     → EXPECTED: exactly $24,670,890.87 — the same cumulative net the API,
-       the raw ledger, and P1's acceptance all agreed on.
-     FAIL LOOKS LIKE: any other number — the UI is misadding or
-     mis-rendering money; stop and report.
-
-□ 9. GATE P2-2, automated half. One line (API from W2 still running):
-     cd "C:\AI_Projects\Camfil CRM\web"; npm run tripwire
-     → EXPECTED: a per-screen/per-width list ending
-       TRIPWIRE 25/25 layout PASS · rep-scope PASS.
-     FAIL LOOKS LIKE: any line naming a screen and width that FAILED
-     (page wider than viewport), or the scope assertion failing.
-
-□ 10. GATE P2-2, manual half (iPad portrait + landscape). In W3, stop the
-     dev server (Ctrl+C) and run: cd "C:\AI_Projects\Camfil CRM\web"; npm run dev:lan
-     Get the PC's address (one line):
-     (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*"} | Select-Object -First 1).IPAddress
-     On the iPad's Safari open http://THAT-ADDRESS:5177, log in as the VP,
-     and try to swipe the page sideways on Command and on Leaderboards, in
-     BOTH portrait and landscape.
-     → EXPECTED: the page never moves horizontally; the Board sits 4-wide
-       in landscape and collapses (4→2) in portrait; tables drop their
-       lesser columns instead of spilling; everything stays readable.
-     FAIL LOOKS LIKE: the whole page slides sideways, tiles/tables cut off
-     at the right edge, or a horizontal scrollbar on the page itself.
+```powershell
+cd "C:\AI_Projects\Camfil CRM"; .\scripts\run-all.ps1
 ```
 
-## P4 — Signals + AI
+Then open **http://127.0.0.1:5177** and log in from the table below.
 
-**The four signal generators (all deterministic, all derived).** After every
-seed — and on demand — `generate_signals()` derives the queue from table
-data alone: **reorder_due** (units inside `reorder_lookahead_days` of their
-cadence due date, plus any unit whose telemetry `filter_life_pct` is at or
-under the trigger), **defection_risk** (metric 7's view verbatim: silence
-past `expected_changeout_months × 1.5`, scored by cycles-missed × annual
-value), **conquest** (competitor units with no order history, cross-referenced
-through `filter_fits` to our best-fitting replacement SKU), and
-**discount_anomaly** (order lines in the trailing window whose discount sits
-more than 2σ above their family's median). Every card carries its reasons on
-its face; thresholds live in the `signal_policy` config row (survives
-reseeds); reruns upsert by a deterministic `dedupe_key` — no duplicates, no
-touching assigned/actioned/dismissed cards, zero audit noise when nothing
-changed.
+What the three commands do:
 
-Regenerate on demand (admin session): `POST /api/admin/generate-signals` —
-one PowerShell line, after logging in as priya.nair@plenum.demo:
+1. `docker compose up -d` — starts Postgres 16 (host port **5434**; this
+   machine's native PostgreSQL owns 5432/5433) and, on first run, creates the
+   non-privileged `plenum_app` role the API is confined to (RLS applies to
+   every query it makes).
+2. `cargo run --bin seed` — applies migrations (the only thing that does),
+   then truncates and regenerates the identical synthetic world every run
+   (PRNG seed 20260717): prints per-entity counts, the
+   `ORDERS TOTAL: 17353 (gate: >15000)` line, refreshes rollups, analyzes,
+   derives the signal queue, and prints the login table.
+3. `.\scripts\run-all.ps1` — starts the API (127.0.0.1:5777) and the Vite
+   web server (127.0.0.1:5177) in their own windows. On a fresh clone it
+   first materializes a dev `.env` (dev-only credentials that already live in
+   `docker-compose.yml`; `COOKIE_SECURE=false` so plain-HTTP localhost
+   sessions work; AI key left empty — every screen still works with AI off).
 
+## Logins
+
+Password for **every** demo user: `demo-plenum-2026` (dev-only by design —
+it is printed by the seed and lives nowhere real).
+
+| email                      | role             | territories |
+| -------------------------- | ---------------- | ----------- |
+| valerie.price@plenum.demo  | vp               | ALL (8)     |
+| priya.nair@plenum.demo     | admin            | ALL (8)     |
+| rachel.moore@plenum.demo   | regional_manager | NE-1+SC-1+SE-1 |
+| marcus.reed@plenum.demo    | regional_manager | CE-1+CW-1+MT-1+MW-1 |
+| renee.vega@plenum.demo     | regional_manager | CE-1+CW-1+W-1 |
+| nora.ellery@plenum.demo    | rep              | NE-1        |
+| nathan.eastman@plenum.demo | rep              | NE-1        |
+| serena.estes@plenum.demo   | rep              | SE-1 — the scope-isolation rep |
+| sam.cole@plenum.demo       | rep              | SC-1        |
+| miles.webb@plenum.demo     | rep              | MW-1        |
+| mia.winters@plenum.demo    | rep              | MW-1        |
+| mona.tate@plenum.demo      | rep              | MT-1        |
+| dana.cross@plenum.demo     | rep              | CE-1+CW-1 (dual-territory) |
+| wes.turner@plenum.demo     | rep              | W-1 — the leakage rep |
+| willa.reyes@plenum.demo    | rep              | W-1         |
+| celine.roy@plenum.demo     | rep              | CE-1        |
+| cole.brandt@plenum.demo    | rep              | CW-1        |
+
+## Demo reset — one line
+
+```powershell
+cd "C:\AI_Projects\Camfil CRM"; .\scripts\demo-reset.ps1
 ```
-cd "C:\AI_Projects\Camfil CRM"; $s = New-Object Microsoft.PowerShell.Commands.WebRequestSession; Invoke-RestMethod -Uri "http://127.0.0.1:5777/api/auth/login" -Method Post -ContentType "application/json" -Body '{"email":"priya.nair@plenum.demo","password":"demo-plenum-2026"}' -WebSession $s | Out-Null; Invoke-RestMethod -Uri "http://127.0.0.1:5777/api/admin/generate-signals" -Method Post -WebSession $s | ConvertTo-Json -Depth 4
-```
 
-**AI env keys (.env only — never commit a key).** Copy `.env.example`; the
-four P4 keys are `ANTHROPIC_API_KEY` (leave empty to run with AI off —
-every screen still works), `ANTHROPIC_MODEL` (default `claude-sonnet-5`),
-`AI_ASK_ENABLED`, `AI_DISCOUNT_ENABLED` (default true). Put your key in
-`.env`, never in any committed file — `.env` is gitignored and the key never
-reaches the client bundle or a log line.
+Reseeds the identical world (same anchors, same story beats), refreshes the
+rollups, re-analyzes, and regenerates the signal queue. Config tables
+(`discount_policy`, `signal_policy`, `territory_states`) survive — they are
+seeded in migrations, not in the wipe. **Open browser sessions must log in
+again after a reset** (API sessions are in-memory by design).
 
-**Ask PLENUM** (`/ask`, or Ctrl-K anywhere): your question becomes ONE
-PostgreSQL SELECT over a whitelisted semantic layer — `v_order_facts`, the
-four `v_*_period` rollup views, and `v_defection_risk` — validated against
-the real SQL AST (single statement, SELECT-only, whitelisted relations
-only), executed inside YOUR read-only RLS session with a 5s timeout and an
-injected LIMIT 500, and shown with the SQL itself as receipts. A rep cannot
-ask their way into another territory. With no key the page serves the
-saved-question library instead, and nothing errors.
+## The 7-minute demo script (spec §13)
 
-Acceptance walk: the P4 unit's 12 checks (Signals queue + Ridgeline card,
-draft-from-signal, scope, write-backs, idempotent regeneration, Command
-rewire, flag-off/flag-on Ask, recommender degradation, telemetry, tripwire
-55+3, reseed) live in the session report and HANDOFF-LOG — run them from
-docs/HANDOFF-LOG.md's newest entry.
+1. **Open on the Signals queue** — Ridgeline Grain defection card. "This
+   account went quiet 11 months ago; at their cadence that's ~$34k/yr of
+   cartridges now going to a will-fit competitor. PLENUM caught it, showed
+   its math, and drafted the win-back quote." *(Theses 1, 3, 4, 5 in 60
+   seconds.)*
+2. Command screen — Territory Board; flip **gross → net**: every number on
+   screen moves at once. Then deliver the "watch rankings move" line on
+   **Leaderboards → customers → 2025**: flip GROSS → NET and watch Vantage
+   Metalworks Coastal drop out of the top-10 while Blue Ridge Fabrication
+   enters (the P2 gate amendment: the frozen seed holds territory order at
+   2026, so the re-rank observable lives on the customers tab). "Your best
+   rep on volume is your worst on margin. Traditional CRMs can't show you
+   this because they store one revenue number."
+3. Leaderboards — customers per quarter / year / cumulative, both bases (the
+   requirement list, live).
+4. Account 360 — installed-base timeline: "every unit is an annuity with a
+   due date."
+5. Quote at 28% → approval flow → audit trail. Governance, not vibes.
+6. Ask PLENUM — **both forms, the live-or-not call is D.'s at rehearsal:**
+   - **Live** (key present): ask "top 10 customers by net revenue in 2025" —
+     table + chart + the SQL receipts; as a rep the same question returns
+     own-scope rows only (RLS, not prompt engineering).
+   - **Flags-off fallback** (no key / no network): the page serves the
+     saved-question library — seven standing questions, each landing on a
+     live screen; nothing errors.
+7. Close on the platform story: Artifact 1's collector pushing filter-life
+   into this queue (`POST /api/telemetry/filter-life` → regenerate → the
+   card appears; push it back up → the card expires). "Sensor to ledger.
+   That's the solutions-architect job, and this is what it looks like."
+
+Bonus beats now on screen: **Territory Map** (the board projected on the
+continent — rep view shows foreign territories as dimmed silhouettes with no
+dollars), **Leakage** (distribution, the anomaly feed that matches the
+signal chips 1:1, and the rep × family heat table where Wes Turner reads
+worst), **Data Quality** (the seeded mess, found — mess is information).
+
+## Territory Map — the committed map asset
+
+The US map is a static, public-domain, committed-to-repo SVG (spec §12 as
+amended 2026-07-22 — no tile services, no geocoding, no geo libraries, no
+runtime fetches):
+
+- Asset: [web/src/map/blank-us-map-states-only.svg](web/src/map/blank-us-map-states-only.svg)
+  — "Blank US Map (states only).svg" by **Heitordp**, Wikimedia Commons,
+  license **CC0 1.0 Universal Public Domain Dedication**.
+- The app renders [web/src/map/usStates.ts](web/src/map/usStates.ts), a
+  typed module derived from that file (per-state path + USPS code + name).
+- State→territory geography is config: the `territory_states` table
+  (migration 0013), seeded along US Census division lines; Canada renders as
+  two schematic blocks (CA-E / CA-W — province detail out of scope).
 
 ## Development
 
@@ -358,21 +148,70 @@ bash scripts/check.sh   # fmt + clippy -D warnings + sqlx prepare --check + test
 ```
 
 Requires the dev DB up + seeded (integration tests and the sqlx check talk
-to it). `.sqlx/` is committed so offline builds work.
+to it). `.sqlx/` is committed so offline builds work. The responsive
+tripwire (70 layout checks across 14 screens × 5 widths + 5 scope
+assertions) runs with the API up:
+
+```powershell
+cd "C:\AI_Projects\Camfil CRM\web"; npm run tripwire
+```
+
+## Known behaviors (recorded, by design)
+
+- **Quota attainment is measured against the full-year quota** (quarters are
+  prorated /4; years and TTM use the whole annual figure) — mid-year bars
+  sit low on purpose; they are honest.
+- **`mv_product_period` transiently reports 1700** rows after an in-quarter
+  booking + refresh (the booked current-quarter order enters the matview but
+  stays read-filtered by the live-quarter boundary). Benign; reseed restores
+  1699.
+- **Signal counts drift with the clock** by design (due windows, silence
+  boundaries, and the anomaly recency window all read CURRENT_DATE). Two
+  same-day reseeds print identical counts; different days differ. The frozen
+  anchors (row counts, checksums, money totals) never move.
+- **Signal auto-expiry (P5):** an OPEN card whose predicate stops holding is
+  expired by the next generation run (visible under the queue's Expired
+  filter); assigned/actioned/dismissed cards are never auto-touched, and an
+  expired card whose predicate returns is reopened by the generator.
+- **Manager-tier self-approval nicety:** a regional manager who authors a
+  10–25% quote may also approve it (the role tier, not authorship, gates the
+  decision) — reviewed and recorded as accepted for the demo phase.
+- Sessions live in API process memory: restart the API and everyone logs in
+  again.
+- The seed's story beats (Ridgeline Grain silence, the 28% pending quote,
+  the Alpenglow conquest prospect, the leakage rep, duplicate-ish names, two
+  NULL change-out units, one 100%-discount line) are seeded ON PURPOSE —
+  demo script material, not bugs. The Data Quality screen finds the mess;
+  that is the feature.
+
+## Troubleshooting
+
+- **Ports on this machine:** database host port **5434** (container-internal
+  5432 — every `docker compose exec db psql …` is unaffected) · API
+  **127.0.0.1:5777** · web **127.0.0.1:5177** (strictPort — if it is taken,
+  Vite fails loudly rather than drifting). **8080 belongs to another tenant
+  of this machine** (the Local-Secure-Ops bank demo — another agent's active
+  project; never stop or modify it).
+- `cannot bind 127.0.0.1:5777` → a previous PLENUM API window is still open;
+  close it.
+- API window says `database is empty — run: cargo run --bin seed` → exactly
+  that.
+- Login fails from the browser on a machine without a `.env` → run
+  `.\scripts\run-all.ps1` once (it writes the dev `.env` with
+  `COOKIE_SECURE=false`); without it the API defaults to the production
+  cookie posture and plain-HTTP localhost drops the session cookie.
+- **Fresh-clone test on a machine already running PLENUM:** stop the
+  original stack first (`docker compose down` in the original folder) — the
+  database container name and host port are pinned, so two stacks cannot run
+  side by side. The original volume (and its data) survives `down` and comes
+  back with the next `up`.
 
 ## Dev credentials warning
 
 Every password in this repo (`docker-compose.yml`,
-`docker/initdb/01-app-role.sql`, the seeded `demo-plenum-2026`) is a
-**dev/demo-only** value for a localhost demo database of synthetic data.
-None of them may ever be reused for anything real.
-
-## Known demo-phase limits
-
-- Sessions live in API process memory (tower-sessions MemoryStore): restart
-  the API and everyone logs in again. Fine for the demo; a store swap is a
-  later-phase concern.
-- The seed's story beats (Ridgeline Grain silence, the 28% pending quote,
-  the Alpenglow conquest prospect, the leakage rep, duplicate-ish names, two
-  NULL change-out units, one 100%-discount line) are seeded ON PURPOSE —
-  demo script material, not bugs.
+`docker/initdb/01-app-role.sql`, the seeded `demo-plenum-2026`, and the dev
+`.env` that `run-all.ps1` writes) is a **dev/demo-only** value for a
+localhost demo database of synthetic data. None of them may ever be reused
+for anything real. The Anthropic API key is env-only: put it in `.env`
+(gitignored) to light up Ask PLENUM and the COMPS narrative; leave it empty
+and every screen still works.
