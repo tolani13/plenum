@@ -5,12 +5,12 @@
 // Layout: every screen at every supported width must render no wider than its
 // viewport (spec §8: document.documentElement.scrollWidth <= window.innerWidth
 // — a page-level horizontal scrollbar is a build failure).
-//   14 screens × 5 widths = 70 layout observables.
-//   (12 static: login, command, map, leaderboards ×3, leakage, pipeline,
-//    quotes, signals, ask, data-quality; 2 dynamic: /accounts/:id and
-//    /quotes/:id, ids resolved in-test.)
+//   15 screens × 5 widths = 75 layout observables.
+//   (13 static: login, command, map, map-edit-mode (T1 — the VP's editor),
+//    leaderboards ×3, leakage, pipeline, quotes, signals, ask, data-quality;
+//    2 dynamic: /accounts/:id and /quotes/:id, ids resolved in-test.)
 //
-// Scope: FIVE assertions on the surface —
+// Scope: SEVEN assertions on the surface —
 //   · a rep (SE-1) sees EXACTLY ONE territory tile on Command, and it is SE-1;
 //   · a rep's Pipeline shows exactly the opportunities the API returns for them,
 //     and every one is SE-1;
@@ -20,7 +20,11 @@
 //     rows — no foreign rep name anywhere in the grid;
 //   · P5 map-scope: the rep's map DOM contains NO dollar value inside any
 //     element attributed to a foreign territory (fills are config; money is
-//     scoped).
+//     scoped);
+//   · T1 map-edit-scope (rep AND manager, separately): /map — even with
+//     ?edit=1 forced into the URL — carries ZERO edit affordances in the
+//     DOM (no toggle, no editor, no banner), while the VP's map carries the
+//     toggle and her ?edit=1 renders editor + banner.
 //
 // Requires the API on 127.0.0.1:5777 (this dev server only proxies to it).
 
@@ -40,6 +44,8 @@ const STATIC_SCREENS = [
   { name: "login", path: "/login", auth: false },
   { name: "command", path: "/command", auth: true },
   { name: "map", path: "/map", auth: true },
+  // T1: the VP's edit mode (the authed context is the VP session).
+  { name: "map-edit-mode", path: "/map?edit=1", auth: true },
   { name: "leaderboards-reps", path: "/leaderboards?tab=reps", auth: true },
   { name: "leaderboards-items", path: "/leaderboards?tab=items", auth: true },
   { name: "leaderboards-customers", path: "/leaderboards?tab=customers", auth: true },
@@ -81,7 +87,7 @@ async function overflowPx(page: Page): Promise<number> {
   );
 }
 
-test("tripwire: responsive layout (70) + rep scope (command + pipeline + signals + leakage + map)", async ({
+test("tripwire: responsive layout (75) + rep scope (command + pipeline + signals + leakage + map + edit affordances)", async ({
   browser,
 }) => {
   const authed: BrowserContext = await browser.newContext();
@@ -262,7 +268,57 @@ test("tripwire: responsive layout (70) + rep scope (command + pipeline + signals
       ? `  PASS  map-scope  (${mapAudit.statesDrawn} shapes drawn, 0 foreign $)`
       : `  FAIL  map-scope  (foreign $ in: ${mapAudit.foreignWithDollars.join(", ")}; shapes=${mapAudit.statesDrawn})`,
   );
+
+  // 6 · T1 — the rep's map carries ZERO edit affordances, even with ?edit=1
+  // forced into the URL (the server 403s her writes regardless; this pins
+  // the DOM half of the law).
+  const EDIT_TESTIDS = ["map-edit-toggle", "map-editor", "map-edit-banner"];
+  const countAffordances = async (page: Page): Promise<number> => {
+    let n = 0;
+    for (const id of EDIT_TESTIDS) n += await page.getByTestId(id).count();
+    return n;
+  };
+  await repPage.goto("/map?edit=1");
+  await waitReady(repPage);
+  const repAffordances = await countAffordances(repPage);
+  const repEditScopeOk = repAffordances === 0;
+  console.log(
+    repEditScopeOk
+      ? `  PASS  map-edit-scope-rep  (0 edit affordances with ?edit=1)`
+      : `  FAIL  map-edit-scope-rep  (${repAffordances} edit affordances in a rep's DOM)`,
+  );
   await repPage.close();
+
+  // 7 · T1 — same law for a manager (explicitly rejected from the surface),
+  // plus the positive half: the VP's map HAS the toggle, and her ?edit=1
+  // renders the editor and the planning-view banner.
+  const mgrCtx: BrowserContext = await browser.newContext();
+  const mgrPage = await mgrCtx.newPage();
+  await mgrPage.setViewportSize({ width: 1440, height: 900 });
+  await loginAs(mgrPage, "rachel.moore@plenum.demo");
+  await mgrPage.goto("/map?edit=1");
+  await waitReady(mgrPage);
+  const mgrAffordances = await countAffordances(mgrPage);
+  await mgrCtx.close();
+
+  const vpMapPage = await authed.newPage();
+  await vpMapPage.setViewportSize({ width: 1440, height: 900 });
+  await vpMapPage.goto("/map");
+  await waitReady(vpMapPage);
+  const vpToggle = await vpMapPage.getByTestId("map-edit-toggle").count();
+  await vpMapPage.goto("/map?edit=1");
+  await waitReady(vpMapPage);
+  const vpEditor = await vpMapPage.getByTestId("map-editor").count();
+  const vpBanner = await vpMapPage.getByTestId("map-edit-banner").count();
+  await vpMapPage.close();
+
+  const mgrEditScopeOk =
+    mgrAffordances === 0 && vpToggle === 1 && vpEditor === 1 && vpBanner === 1;
+  console.log(
+    mgrEditScopeOk
+      ? `  PASS  map-edit-scope-mgr  (manager 0 affordances; VP toggle/editor/banner present)`
+      : `  FAIL  map-edit-scope-mgr  (mgr=${mgrAffordances}, vp toggle=${vpToggle} editor=${vpEditor} banner=${vpBanner})`,
+  );
 
   console.log(
     `\nTRIPWIRE ${pass}/${expected} layout ${failures.length === 0 ? "PASS" : "FAIL"} · ` +
@@ -270,7 +326,9 @@ test("tripwire: responsive layout (70) + rep scope (command + pipeline + signals
       `pipeline-scope ${pipelineScopeOk ? "PASS" : "FAIL"} · ` +
       `signals-scope ${signalsScopeOk ? "PASS" : "FAIL"} · ` +
       `leakage-scope ${leakageScopeOk ? "PASS" : "FAIL"} · ` +
-      `map-scope ${mapScopeOk ? "PASS" : "FAIL"}` +
+      `map-scope ${mapScopeOk ? "PASS" : "FAIL"} · ` +
+      `map-edit-scope-rep ${repEditScopeOk ? "PASS" : "FAIL"} · ` +
+      `map-edit-scope-mgr ${mgrEditScopeOk ? "PASS" : "FAIL"}` +
       (failures.length ? `\n  failures: ${failures.join(", ")}` : ""),
   );
 
@@ -291,5 +349,13 @@ test("tripwire: responsive layout (70) + rep scope (command + pipeline + signals
   expect(
     mapScopeOk,
     "rep map must carry no foreign-territory dollar values",
+  ).toBe(true);
+  expect(
+    repEditScopeOk,
+    "a rep's map DOM must carry zero edit affordances",
+  ).toBe(true);
+  expect(
+    mgrEditScopeOk,
+    "a manager's map DOM must carry zero edit affordances (and the VP's must have them)",
   ).toBe(true);
 });

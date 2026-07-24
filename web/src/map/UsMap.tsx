@@ -25,8 +25,55 @@ const TERRITORY_FILL: Record<string, string> = {
   "CW-1": "var(--color-terr-cw1)",
 };
 
-export function territoryFill(code: string): string {
-  return TERRITORY_FILL[code] ?? "var(--color-land-dim)";
+/** T1 planning palette: token name → tokens.css entry. LITERAL var() names
+ *  on purpose — Tailwind v4 prunes @theme variables that never appear
+ *  verbatim in scanned source, so a constructed `var(--color-${token})`
+ *  would leave every planning token undefined at runtime. */
+const PLANNING_FILL: Record<string, string> = {
+  "terr-plan-1": "var(--color-terr-plan-1)",
+  "terr-plan-2": "var(--color-terr-plan-2)",
+  "terr-plan-3": "var(--color-terr-plan-3)",
+  "terr-plan-4": "var(--color-terr-plan-4)",
+  "terr-plan-5": "var(--color-terr-plan-5)",
+  "terr-plan-6": "var(--color-terr-plan-6)",
+  "terr-plan-7": "var(--color-terr-plan-7)",
+  "terr-plan-8": "var(--color-terr-plan-8)",
+};
+
+export function planningFill(token: string): string {
+  return PLANNING_FILL[token] ?? "var(--color-land-dim)";
+}
+
+const PLANNING_POOL = Object.keys(PLANNING_FILL);
+
+/** T1 (D5) — THE one fill resolution, built from the territory config the
+ *  caller's payload carries (states-feed roster or the admin list). Rules,
+ *  in order: an API color_token wins when present; the canonical P5 mapping
+ *  otherwise; a runtime territory with no token gets a deterministic pool
+ *  chip (its position in the sorted list of such codes → pool index).
+ *  Legend, editor, panel, tooltip, and map ALL render through the resolver
+ *  this returns — one function, no drift. */
+export function makeTerritoryFill(
+  territories: readonly { territory_code: string; color_token: string | null }[],
+): (code: string) => string {
+  const tokened = new Map<string, string>();
+  const untokenedRuntime: string[] = [];
+  for (const t of territories) {
+    if (t.color_token) {
+      tokened.set(t.territory_code, t.color_token);
+    } else if (!(t.territory_code in TERRITORY_FILL)) {
+      untokenedRuntime.push(t.territory_code);
+    }
+  }
+  untokenedRuntime.sort();
+  return (code: string): string => {
+    const token = tokened.get(code);
+    if (token) return planningFill(token);
+    if (TERRITORY_FILL[code]) return TERRITORY_FILL[code];
+    const i = untokenedRuntime.indexOf(code);
+    if (i >= 0) return planningFill(PLANNING_POOL[i % PLANNING_POOL.length]);
+    return "var(--color-land-dim)";
+  };
 }
 
 /** The source asset spans 0…593; the Canada band lives ABOVE it in negative
@@ -101,6 +148,10 @@ export function UsMap({
   onSelect,
   onHover,
   canadaSubtitle,
+  fill,
+  editing = false,
+  onPaint,
+  onStateDragStart,
 }: {
   /** state code → territory code (territory_states, via the roster). */
   territoryOf: (state: string) => string | undefined;
@@ -112,6 +163,15 @@ export function UsMap({
   onHover: (hover: MapHover | null) => void;
   /** In-scope Canada block money line, keyed by territory code. */
   canadaSubtitle: (territoryCode: string) => string | null;
+  /** THE fill resolution (makeTerritoryFill) — one function, no drift (D5). */
+  fill: (code: string) => string;
+  /** T1 edit mode (vp/admin only — the parent gates it): clicking a US
+   *  state PAINTS it into the editor's selected territory instead of
+   *  opening the panel; mousedown starts a possible drag. Canada blocks
+   *  are not clickable in edit mode (v1 lock). */
+  editing?: boolean;
+  onPaint?: (stateCode: string) => void;
+  onStateDragStart?: (stateCode: string, e: React.MouseEvent) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [boxes, setBoxes] = useState<Record<string, Box>>({});
@@ -175,7 +235,10 @@ export function UsMap({
 
   const stateNodes = US_STATES.map((s) => {
     const territory = territoryOf(s.code) ?? "";
-    const inScope = scopeCodes.has(territory);
+    // T1: edit mode paints CONFIG — every territory's fill shows (the editor
+    // is vp/admin-only, and a just-created territory is not yet in the
+    // session's cached scope list; money stays scope-gated regardless).
+    const inScope = editing || scopeCodes.has(territory);
     const isSelected = selected !== null && territory === selected;
     return (
       <path
@@ -185,7 +248,7 @@ export function UsMap({
         data-territory={territory}
         className="cursor-pointer transition-[filter,fill-opacity] duration-150"
         style={{
-          fill: inScope ? territoryFill(territory) : "var(--color-land-dim)",
+          fill: inScope ? fill(territory) : "var(--color-land-dim)",
           stroke: isSelected
             ? "var(--color-seam-strong)"
             : "var(--color-seam)",
@@ -195,7 +258,14 @@ export function UsMap({
         onMouseEnter={(e) => report(e, s.code, s.name, territory)}
         onMouseMove={(e) => report(e, s.code, s.name, territory)}
         onMouseLeave={() => onHover(null)}
-        onClick={() => territory && onSelect(territory)}
+        onMouseDown={
+          editing ? (e) => onStateDragStart?.(s.code, e) : undefined
+        }
+        onClick={
+          editing
+            ? () => onPaint?.(s.code)
+            : () => territory && onSelect(territory)
+        }
       />
     );
   });
@@ -243,15 +313,19 @@ export function UsMap({
       {/* Canada blocks — same seam-and-plate language, above the US. */}
       {CANADA_BLOCKS.map((b) => {
         const territory = territoryOf(b.code) ?? "";
-        const inScope = scopeCodes.has(territory);
+        const inScope = editing || scopeCodes.has(territory);
         const isSelected = selected !== null && territory === selected;
-        const sub = inScope ? canadaSubtitle(territory) : null;
+        const sub = scopeCodes.has(territory)
+          ? canadaSubtitle(territory)
+          : null;
         return (
           <g
             key={b.code}
             data-state={b.code}
             data-territory={territory}
-            className="cursor-pointer transition-[filter] duration-150"
+            className={`transition-[filter] duration-150 ${
+              editing ? "cursor-not-allowed" : "cursor-pointer"
+            }`}
             style={{ filter: isSelected ? "brightness(1.22)" : undefined }}
             onMouseEnter={(e) =>
               report(e, b.code, `${b.label} — schematic block`, territory)
@@ -260,14 +334,14 @@ export function UsMap({
               report(e, b.code, `${b.label} — schematic block`, territory)
             }
             onMouseLeave={() => onHover(null)}
-            onClick={() => territory && onSelect(territory)}
+            // v1 lock: Canada blocks are inert in edit mode (the tooltip
+            // carries the "lands in v2" note — TerritoryMap renders it).
+            onClick={editing ? undefined : () => territory && onSelect(territory)}
           >
             <path
               d={b.d}
               style={{
-                fill: inScope
-                  ? territoryFill(territory)
-                  : "var(--color-land-dim)",
+                fill: inScope ? fill(territory) : "var(--color-land-dim)",
                 stroke: isSelected
                   ? "var(--color-seam-strong)"
                   : "var(--color-seam)",
@@ -345,8 +419,8 @@ export function UsMap({
           data-territory={territoryOf("DC") ?? ""}
           className="cursor-pointer"
           style={{
-            fill: scopeCodes.has(territoryOf("DC") ?? "")
-              ? territoryFill(territoryOf("DC") ?? "")
+            fill: editing || scopeCodes.has(territoryOf("DC") ?? "")
+              ? fill(territoryOf("DC") ?? "")
               : "var(--color-land-dim)",
             stroke: "var(--color-seam)",
             strokeWidth: 0.75,
@@ -355,10 +429,15 @@ export function UsMap({
             report(e, "DC", "District of Columbia", territoryOf("DC") ?? "")
           }
           onMouseLeave={() => onHover(null)}
-          onClick={() => {
-            const t = territoryOf("DC");
-            if (t) onSelect(t);
-          }}
+          onMouseDown={editing ? (e) => onStateDragStart?.("DC", e) : undefined}
+          onClick={
+            editing
+              ? () => onPaint?.("DC")
+              : () => {
+                  const t = territoryOf("DC");
+                  if (t) onSelect(t);
+                }
+          }
         />
       )}
 

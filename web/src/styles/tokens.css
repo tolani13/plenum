@@ -64,6 +64,25 @@
   --color-graticule: #101a24;
   --color-land-dim: #161d26;
 
+  /* ---- T1 · Territory PLANNING palette (D5) ------------------------------
+     Eight chips for VP/admin-created (or recolored) territories in the map
+     editor — deliberately one notch more chromatic than the canonical
+     territory fills above so a planning territory reads as PROVISIONAL, yet
+     still far below the state-semantic tokens; AA-legible under the map's
+     mist labels on the graphite ground (dark is the only theme — §8).
+     Alarm/amber hues stay reserved; flow blue stays selection-only. The API
+     validates color_token against exactly these eight names
+     (crates/api/src/routes/territories.rs PLANNING_PALETTE — one list,
+     mirrored, tokens.css remains the only place a colour VALUE lives). */
+  --color-terr-plan-1: #245a4e; /* viridian     */
+  --color-terr-plan-2: #5a4a24; /* brass        */
+  --color-terr-plan-3: #24455a; /* harbor blue  */
+  --color-terr-plan-4: #5a2438; /* madder       */
+  --color-terr-plan-5: #3c5a24; /* moss         */
+  --color-terr-plan-6: #4a2f5a; /* amethyst     */
+  --color-terr-plan-7: #24575a; /* lagoon       */
+  --color-terr-plan-8: #5a3924; /* sienna       */
+
   /* ---- P5 · Leakage heat ramp (R1) ---------------------------------------
      Five bands for rep × family cells, keyed RELATIVE to the visible table's
      aggregate leakage (the P2 LED-band logic, extended): 0 = cooler than the
