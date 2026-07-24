@@ -193,10 +193,20 @@ One entry per build unit. Newest first.
   to include it — it runs with every tripwire. Post-fix: full suite 63
   green · tripwire 75/75 + 7 scope · dragproof green · geography
   canonical (66, AL→SE-1). D.'s own re-drag re-owed before "merge".
-- **Phase gate: OPEN — awaiting D.** Session holds for D.'s acceptance
-  walk (the 8-check T1 acceptance in the unit prompt — check 4 re-run by
-  D.'s hand after the fix above) and the pre-authorized PHASE 2 merge on
-  D.'s literal "merge" in this session.
+- **Phase gate: T1 ACCEPTED** — D.'s literal "merge" reply, 2026-07-23
+  (merge = approval per this unit's pre-authorized PHASE 2). Attribution
+  for the record: checks 1–3, 5–7, 8a passed under D.'s own hand
+  pre-merge; check 4 failed, was fixed same-session (the pointer-event
+  rebuild above) and re-proven with trusted Playwright input — D.'s own
+  re-drag of check 4 plus check 8's reset half stand OWED as his
+  observation pass; any failure reopens the gate.
+- **Merge record:** `9e2e7db` — t1-territory-editing merged to main
+  (--no-ff), 2026-07-23 22:30:16 -0400, on D.'s "merge". Staleness check
+  passed (local main AND origin/main both still `5367a5f`). Pushed to
+  origin/main (github.com/tolani13/plenum — main is public; the live
+  Render service tracks main but autoDeploy is OFF, so the live site is
+  UNCHANGED until D. orders a manual deploy). Branch t1-territory-editing
+  kept, per precedent.
 
 ## 2026-07-22 · Deploy: PLENUM on Render (all-Render, one origin)
 
