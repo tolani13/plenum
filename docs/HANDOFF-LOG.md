@@ -170,9 +170,33 @@ One entry per build unit. Newest first.
   audit_log at seed print = 157 (supersedes 17 — the D1 disclosure).
   CLOCK-DRIFTING: signals 40/12/28/168 = 248 on 2026-07-23.
 - **New dependencies: NONE.** Zero crates, zero npm packages.
+- **FIX (same session, pre-merge) — acceptance check 4 FAILED under D.'s
+  real mouse; drag rebuilt on pointer events, trusted-event red→green
+  proven.** Defect: a real mouse-down on a state shape started NATIVE
+  TEXT SELECTION (no preventDefault anywhere on the gesture), and
+  dragging toward the editor highlighted the panel text — the drag path's
+  in-session proof had used synthetic events, which trigger no native
+  default behavior, so it passed while a trusted mouse failed (that
+  proof class is now recorded INADMISSIBLE for gesture defects). Fix in
+  TerritoryMap/UsMap: pointerdown (was mousedown) with e.preventDefault()
+  — selection never starts; `click` still fires per the Pointer Events
+  spec, so click-to-paint is byte-identical — + setPointerCapture on the
+  originating shape, body user-select:none while a drag is armed
+  (restored on pointerup/pointercancel), touch-action:none on shapes in
+  edit mode, and the drop test hit-tests document.elementFromPoint
+  (with capture, event.target stays the shape). New standing spec
+  web/dragproof.spec.ts drives a REAL Playwright mouse (mouse.down →
+  incremental moves → mouse.up): RED against the pre-fix code
+  (isCollapsed === false — text selected, D.'s exact observation),
+  GREEN after (AL re-homed, ghost present mid-drag, zero selection,
+  trusted click-to-paint restore). playwright.config testMatch widened
+  to include it — it runs with every tripwire. Post-fix: full suite 63
+  green · tripwire 75/75 + 7 scope · dragproof green · geography
+  canonical (66, AL→SE-1). D.'s own re-drag re-owed before "merge".
 - **Phase gate: OPEN — awaiting D.** Session holds for D.'s acceptance
-  walk (the 8-check T1 acceptance in the unit prompt) and the
-  pre-authorized PHASE 2 merge on D.'s literal "merge" in this session.
+  walk (the 8-check T1 acceptance in the unit prompt — check 4 re-run by
+  D.'s hand after the fix above) and the pre-authorized PHASE 2 merge on
+  D.'s literal "merge" in this session.
 
 ## 2026-07-22 · Deploy: PLENUM on Render (all-Render, one origin)
 

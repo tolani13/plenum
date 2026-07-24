@@ -185,14 +185,40 @@ export function TerritoryMap() {
     if (paintTarget) paintState(stateCode, paintTarget);
   };
 
-  const onStateDragStart = (code: string, e: React.MouseEvent) => {
+  // T1 FIX (acceptance check 4 failed under a real mouse): the drag is
+  // POINTER-event driven now. A trusted mouse-down on a shape used to start
+  // NATIVE TEXT SELECTION (nothing called preventDefault), and dragging
+  // toward the editor highlighted the panel text instead of arming the drag
+  // — synthetic-event proof missed it because synthetic events trigger no
+  // native default behavior. The rebuilt gesture:
+  //   · preventDefault() on the shape's pointerdown — selection never
+  //     starts (the `click` event still fires per the Pointer Events spec,
+  //     so click-to-paint is untouched);
+  //   · setPointerCapture() on the originating shape — every later move/up
+  //     routes through the capture target regardless of what's under the
+  //     cursor (they still bubble to window, where the listeners live);
+  //   · body user-select:none while a drag is ARMED (belt-and-braces),
+  //     restored on pointerup/pointercancel;
+  //   · the drop test reads document.elementFromPoint(pointer coords) —
+  //     with capture, event.target is the SHAPE, never the drop row;
+  //   · touch-action:none rides the shapes in edit mode (UsMap) so pointer
+  //     dragging isn't stolen by scroll gestures on touch hardware.
+  const onStateDragStart = (code: string, e: React.PointerEvent) => {
     if (code.startsWith(CANADA_PREFIX)) return;
+    if (!e.isPrimary) return;
+    e.preventDefault();
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
     pendingDrag.current = { code, x0: e.clientX, y0: e.clientY };
   };
 
   useEffect(() => {
     if (!editing) return;
-    const onMove = (e: MouseEvent) => {
+    const endDrag = () => {
+      pendingDrag.current = null;
+      document.body.style.userSelect = "";
+      setDrag(null);
+    };
+    const onMove = (e: PointerEvent) => {
       const p = pendingDrag.current;
       if (!p) {
         if (drag) setDrag({ ...drag, x: e.clientX, y: e.clientY });
@@ -200,31 +226,42 @@ export function TerritoryMap() {
       }
       if (Math.abs(e.clientX - p.x0) + Math.abs(e.clientY - p.y0) > 6) {
         pendingDrag.current = null;
+        document.body.style.userSelect = "none";
         setDrag({ code: p.code, x: e.clientX, y: e.clientY });
       }
     };
-    const onUp = (e: MouseEvent) => {
-      pendingDrag.current = null;
-      if (!drag) return;
-      const target = (e.target as Element | null)?.closest?.(
+    const onUp = (e: PointerEvent) => {
+      const wasDragging = drag;
+      if (!wasDragging) {
+        pendingDrag.current = null;
+        return;
+      }
+      // Pointer capture keeps e.target on the SHAPE — hit-test the actual
+      // pointer coordinates for the drop row / legend chip instead.
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const target = under?.closest?.(
         "[data-drop-territory]",
       ) as HTMLElement | null;
       if (target?.dataset.dropTerritory) {
-        paintState(drag.code, target.dataset.dropTerritory);
+        paintState(wasDragging.code, target.dataset.dropTerritory);
       }
       suppressClick.current = true;
-      setDrag(null);
+      endDrag();
       // A drop outside any state path never fires a click — clear the guard
       // on the next tick so the NEXT real click still paints.
       setTimeout(() => {
         suppressClick.current = false;
       }, 0);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    const onCancel = () => endDrag();
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
     return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      document.body.style.userSelect = "";
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, drag, paintTarget]);

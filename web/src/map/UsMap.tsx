@@ -167,11 +167,13 @@ export function UsMap({
   fill: (code: string) => string;
   /** T1 edit mode (vp/admin only — the parent gates it): clicking a US
    *  state PAINTS it into the editor's selected territory instead of
-   *  opening the panel; mousedown starts a possible drag. Canada blocks
-   *  are not clickable in edit mode (v1 lock). */
+   *  opening the panel; pointerdown starts a possible drag (the parent
+   *  preventDefaults + captures the pointer so native text selection can
+   *  never steal the gesture — the check-4 fix). Canada blocks are not
+   *  clickable in edit mode (v1 lock). */
   editing?: boolean;
   onPaint?: (stateCode: string) => void;
-  onStateDragStart?: (stateCode: string, e: React.MouseEvent) => void;
+  onStateDragStart?: (stateCode: string, e: React.PointerEvent) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [boxes, setBoxes] = useState<Record<string, Box>>({});
@@ -254,11 +256,12 @@ export function UsMap({
             : "var(--color-seam)",
           strokeWidth: isSelected ? 1.4 : 0.75,
           filter: isSelected ? "brightness(1.22)" : undefined,
+          touchAction: editing ? "none" : undefined,
         }}
         onMouseEnter={(e) => report(e, s.code, s.name, territory)}
         onMouseMove={(e) => report(e, s.code, s.name, territory)}
         onMouseLeave={() => onHover(null)}
-        onMouseDown={
+        onPointerDown={
           editing ? (e) => onStateDragStart?.(s.code, e) : undefined
         }
         onClick={
@@ -424,12 +427,15 @@ export function UsMap({
               : "var(--color-land-dim)",
             stroke: "var(--color-seam)",
             strokeWidth: 0.75,
+            touchAction: editing ? "none" : undefined,
           }}
           onMouseEnter={(e) =>
             report(e, "DC", "District of Columbia", territoryOf("DC") ?? "")
           }
           onMouseLeave={() => onHover(null)}
-          onMouseDown={editing ? (e) => onStateDragStart?.("DC", e) : undefined}
+          onPointerDown={
+            editing ? (e) => onStateDragStart?.("DC", e) : undefined
+          }
           onClick={
             editing
               ? () => onPaint?.("DC")
