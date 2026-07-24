@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, code, name, region::text AS \"region!\",\n                  quota_year_cents, color_token\n           FROM territories WHERE code = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "code",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "region!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "quota_year_cents",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "color_token",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      false,
+      true
+    ]
+  },
+  "hash": "6172bfac7109472eaea5e332554cfeb6c24baae42af5e6f05140684aa0e74fbb"
+}

@@ -17,13 +17,14 @@ pub mod quotes;
 pub mod signals;
 pub mod states;
 pub mod telemetry;
+pub mod territories;
 
 use std::path::PathBuf;
 
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
-use axum::routing::{any, get, patch, post};
+use axum::routing::{any, get, patch, post, put};
 use axum::Router;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_sessions::cookie::time::Duration;
@@ -105,6 +106,20 @@ pub fn app(state: AppState, cookie_secure: bool) -> Router {
         .route("/api/metrics/coverage", get(metrics::coverage))
         .route("/api/metrics/defection", get(metrics::defection))
         .route("/api/metrics/states", get(states::states))
+        // T1 — territory editing (planning view): vp|admin-gated in the
+        // handlers (the generate-signals precedent), audited via 0014.
+        .route(
+            "/api/territories",
+            get(territories::list_territories).post(territories::create_territory),
+        )
+        .route(
+            "/api/territories/{code}",
+            patch(territories::patch_territory).delete(territories::delete_territory),
+        )
+        .route(
+            "/api/territory-states/{state_code}",
+            put(territories::put_territory_state),
+        )
         .route("/api/data-quality", get(data_quality::data_quality))
         .route("/api/admin/refresh-rollups", post(admin::refresh_rollups))
         .route(

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE territory_states SET territory_code = $2\n           WHERE state_code = $1 AND territory_code IS DISTINCT FROM $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1561b9268ce806ab374c0a33fa178c8839e65097eee580ef5edd9c20dc778e24"
+}
