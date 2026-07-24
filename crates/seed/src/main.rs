@@ -177,6 +177,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     insert::write_all(&pool, &world).await?;
     println!("ok");
 
+    // T1 (D6): restore the canonical Census geography — the territories
+    // truncate above already removed any runtime-created territory; this
+    // removes their dangling state rows and puts every state back on the
+    // 0013 canon (single-sourced from the migration text inside the helper).
+    print!("restoring canonical geography (territory_states)... ");
+    let geo_rows = insert::restore_geography(&pool).await?;
+    println!("ok ({geo_rows} rows — the 0013 Census canon)");
+
     // Post-load ANALYZE: the wipe+reload leaves planner statistics stale until
     // autovacuum's next pass (up to ~a minute) — long enough for the first
     // post-reset clicks to plan without the 0013 index. Derivation-path
@@ -190,6 +198,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nrow counts (queried back from the database):");
     let tables = [
         "territories",
+        "territory_states",
         "users",
         "territory_assignments",
         "accounts",

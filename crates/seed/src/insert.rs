@@ -18,6 +18,43 @@ const TRUNCATE_SQL: &str = "TRUNCATE TABLE \
 
 const CHUNK: usize = 500;
 
+/// T1 (D6) — canonical-geography restore. territory_states is deliberately
+/// OUTSIDE the truncate list (0013's truncate-proof design: geography
+/// survives ordinary use), but T1's planning editor can move states and
+/// runtime-created territories can leave dangling state rows behind after
+/// the territories truncate. NEW LAW: demo reset restores the canonical
+/// Census map. The canonical 66-row mapping has exactly ONE source — the
+/// 0013 migration text, embedded at compile time and re-executed here
+/// (extracted, never hand-copied). DELETE + re-INSERT in one transaction;
+/// works identically on the managed-prod TLS reset path (plain row DML as
+/// the table owner — no superuser assumption; the 0006 audit trigger fires
+/// on every row, actor NULL on superuser dev seeds per the P0 semantics).
+const MIGRATION_0013: &str = include_str!("../../../migrations/0013_territory_map_expiry.sql");
+
+pub async fn restore_geography(pool: &PgPool) -> Result<i64, Box<dyn std::error::Error>> {
+    let start = MIGRATION_0013
+        .find("INSERT INTO territory_states")
+        .ok_or("0013 canonical INSERT not found — migration text changed?")?;
+    let len = MIGRATION_0013[start..]
+        .find(';')
+        .ok_or("0013 canonical INSERT is unterminated")?;
+    let canonical_insert = &MIGRATION_0013[start..=start + len];
+
+    let mut tx: Transaction<'_, Postgres> = pool.begin().await?;
+    sqlx::query("DELETE FROM territory_states")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(canonical_insert).execute(&mut *tx).await?;
+    let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM territory_states")
+        .fetch_one(&mut *tx)
+        .await?;
+    if rows != 66 {
+        return Err(format!("canonical geography is {rows} rows, expected 66").into());
+    }
+    tx.commit().await?;
+    Ok(rows)
+}
+
 pub async fn write_all(pool: &PgPool, w: &World) -> sqlx::Result<()> {
     let mut tx: Transaction<'_, Postgres> = pool.begin().await?;
 
