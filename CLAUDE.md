@@ -77,9 +77,24 @@ Scripts: scripts/run-all.ps1 (API + web, materializes a dev .env on fresh
 clones — committed dev values only) · scripts/demo-reset.ps1 (reseed
 one-liner; in-memory sessions mean re-login after). PRODUCTION.md exists at
 the repo root (the demo→deployment map; keep truthful).
-Tripwire is now 70 layout (14 screens × 5 widths) + 5 scope
+T1 Territory editing (planning view) merged: /map Edit mode (vp/admin
+ONLY; rep/manager DOM carries zero edit affordances — tripwire-asserted).
+Write surface: PUT /api/territory-states/:state_code · POST/PATCH/DELETE
+/api/territories · GET /api/territories (vp/admin). All app-gated
+vp|admin + audited via audit_row_change (0014 adds territory_states.id
+uuid + triggers + write GRANTs — geography is no longer app-read-only;
+config tables' defense = role gate + immutable audit, no RLS). Colors:
+territories.color_token (nullable) resolved client-side through
+territoryFill; planning palette = --terr-plan-* tokens.css entries ONLY.
+PLANNING-VIEW LAW: map grouping/planning sums are site-attributed config;
+Command/Leaderboards/Board figures and RLS scope are order-attributed and
+UNTOUCHED by map edits (tested). Canada blocks locked in v1. Seed now
+restores canonical Census geography (demo reset = canon; runtime
+territories + their state rows wiped). Realignment/state-split path:
+docs/territory-realignment-prep.md.
+Tripwire is now 75 layout (15 screens × 5 widths) + 7 scope
 (command/pipeline/signals/leakage/map — map = no foreign-territory dollars
-in a rep's DOM).
+in a rep's DOM — plus rep AND manager zero-edit-affordance on /map).
 Metrics layer: plenum_app has NO grant on raw mv_* rollups; all metric reads
 go through security_invoker facts views or scoped views carrying the
 v_user_scope fail-closed predicate; refresh only via refresh_rollups()

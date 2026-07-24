@@ -2,7 +2,27 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-22 — P5 Polish + demo hardening + Territory Map: built
+## [LATEST] 2026-07-23 — T1 Territory Map Editing (planning view): built
+- T1 territory editing (planning view) shipped: VP/admin redraw the map
+  (paint + drag), define territories, audited, planning-only; realignment
+  commit + state splits + Canada editing recorded as future units in
+  territory-realignment-prep.md.
+- First post-ladder unit (NOT a phase), on `t1-territory-editing` from
+  main 5367a5f. /map gains an Edit mode for vp/admin only: click-to-paint
+  (primary) + drag-to-row (secondary) state reassignment, territory
+  create/rename/recolor/delete (delete refused with a reason unless
+  completely empty), standing planning-view banner. Write surface
+  PUT /api/territory-states/:code · POST/PATCH/DELETE/GET /api/territories,
+  all vp|admin-gated and audited (0014: territory_states.id + audit
+  triggers on both territory tables + write GRANTs — disclosed posture
+  change from app-read-only geography). PLANNING-VIEW LAW tested: the
+  Territory Board feed is byte-identical across a reassignment while
+  /api/metrics/states regroups live from territory_states. Seed now
+  restores canonical Census geography (66 rows single-sourced from the
+  0013 text). Tripwire 75 layout + 7 scope. Anchors intact
+  (17353/11556020473 · mv 120/195/1699/614 · ledger 2467089087).
+
+## 2026-07-22 — P5 Polish + demo hardening + Territory Map: built
 - FINAL phase, on `p5-polish-map` from main 8bfe7c7. Shipped surface: the
   Territory Map (/map — the Board projected on the continent: committed CC0
   US-states SVG rendered as typed React paths, territory_states geography
