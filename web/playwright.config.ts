@@ -6,7 +6,7 @@ import { defineConfig, devices } from "@playwright/test";
 // says so in its failure message if /api is unreachable.
 export default defineConfig({
   testDir: ".",
-  testMatch: /tripwire\.spec\.ts/,
+  testMatch: /(tripwire|dragproof)\.spec\.ts/,
   fullyParallel: false,
   workers: 1,
   reporter: "list",

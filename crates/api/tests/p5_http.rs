@@ -148,6 +148,19 @@ static P5_MUTATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(
 
 #[tokio::test]
 async fn states_endpoint_scope_anchors_roster_and_grammar() {
+    // T1 (disclosed maintenance): t1_http's geography mutations run in a
+    // PARALLEL test binary, and this test pins roster == 8 territories with
+    // all-canonical grouping. Both sides serialize on the same Postgres
+    // advisory lock (transaction-scoped — a panic releases it); t1_http
+    // restores the canonical map before dropping its lock, so everything
+    // this test asserts still holds the moment it acquires the key.
+    let lock_pool = test_pool().await;
+    let mut geo_guard = lock_pool.begin().await.expect("geo lock tx");
+    sqlx::query("SELECT pg_advisory_xact_lock(54311743)")
+        .execute(&mut *geo_guard)
+        .await
+        .expect("geo lock acquired");
+
     let app = test_app().await;
 
     // 401 unauthenticated.

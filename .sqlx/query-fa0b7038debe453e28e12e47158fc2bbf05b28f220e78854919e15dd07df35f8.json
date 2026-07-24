@@ -1,0 +1,55 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO territories (code, name, region, quota_year_cents, color_token)\n           VALUES ($1, $2, $3::text::region, 0, $4)\n           RETURNING id, code, name, region::text AS \"region!\",\n                     quota_year_cents, color_token",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "code",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "region!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "quota_year_cents",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "color_token",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      false,
+      true
+    ]
+  },
+  "hash": "fa0b7038debe453e28e12e47158fc2bbf05b28f220e78854919e15dd07df35f8"
+}

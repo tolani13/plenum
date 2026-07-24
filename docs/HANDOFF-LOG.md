@@ -4,6 +4,200 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-23 · T1 — Territory Map Editing (planning view)
+
+- **Unit:** T1 (first post-ladder unit — NOT a phase): /map gains a
+  VP/admin-only Edit mode — reassign US states + DC by click-to-paint or
+  drag, create/rename/recolor/delete territories, every mutation audited,
+  planning-view only (official rollups and rep scope untouched by design
+  and by test) — branch `t1-territory-editing` from main `5367a5f`.
+  Tier 3, one-and-done. Live site NOT touched (autoDeploy off; a Render
+  deploy is D.'s separate call).
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+- **Architect rulings recorded (T1-D1…D10, dispositions inline):**
+  - **T1-D1 — Migration 0014 (additive) — SHIPPED as ruled.**
+    territory_states gains `id uuid NOT NULL DEFAULT gen_random_uuid()`
+    + UNIQUE, solely so `audit_row_change()` (which stamps entity_id from
+    NEW.id/OLD.id) can audit it — state_code stays PK and join key, the
+    0013 truncate-proof rationale untouched. The 0006 trigger is attached
+    to BOTH territory_states and territories. territories gains nullable
+    `color_token`. GRANT INSERT/UPDATE/DELETE on both tables to
+    plenum_app — the DISCLOSED posture change: geography stops being
+    app-read-only; defense for these RLS-less config tables = handler
+    role gate (vp|admin, the generate-signals precedent) + app-immutable
+    audit + typed errors, stated in the migration comment 0013-style.
+    PRE finding, disclosed: territories already carried app DML via
+    0007's blanket GRANT ON ALL TABLES (it existed at 0007 time; only
+    territory_states, born in 0013, was SELECT-only) — the explicit grant
+    is kept so T1's intended posture is visible in one place.
+    SEED CONSEQUENCE, disclosed in the migration comment: with the
+    triggers attached, the seed's territory INSERTs (8) and the D6
+    geography restore (66 DELETE + 66 INSERT) are audited — audit_log at
+    the seed's printed summary is now 157 (was 17), deterministic, NULL
+    actor on superuser dev seeds (P0 semantics). No test pinned the 17.
+  - **T1-D2 — Write surface — SHIPPED as ruled** in new
+    crates/api/src/routes/territories.rs: PUT /api/territory-states/:code
+    (404 unknown state · 422 Canada block AND province, message says
+    "lands in v2" · 422 unknown territory · only-when-changed UPDATE so a
+    repaint writes zero audit noise, the P4 no-clobber discipline);
+    POST /api/territories (201; 422 dup code / bad code format (2–8
+    uppercase-alnum-dash) / unknown region / color_token outside the
+    8-name planning palette; quota_year_cents pinned 0 — creation never
+    sets quota); PATCH :code (rename/recolor only, 404 unknown, 422
+    empty patch); DELETE :code (422 with a reason NAMING every failing
+    emptiness check — mapped states / rep assignments / accounts /
+    orders / opportunities — with live counts); GET /api/territories
+    (vp|admin disclosed read; full list incl. empty territories +
+    color_token, house envelope, well under the 200 law). All vp|admin →
+    403, unauth → 401, both proven for rep AND manager on every endpoint.
+  - **T1-D3 — Authz plumbing — SHIPPED as ruled:** SessionUser extractor
+    + common::require_role (the generate-signals shape); every write runs
+    inside rls_tx so the app.user_id GUC pins the audit actor and
+    reassign + audit commit atomically.
+  - **T1-D4 — Edit mode UI — SHIPPED as ruled:** "Edit map" toggle
+    rendered only for vp/admin (useMe), edit state in the URL (?edit=1 —
+    the house controls-in-URL law; a rep with ?edit=1 forced gets the
+    byte-identical P5 screen). Persistent planning-view banner verbatim.
+    Side panel becomes MapEditor: territory list with color chips,
+    per-territory planning sum (client-side sum of the caller's state
+    rows — no new endpoint), New-territory form (code/name/region
+    dropdown from existing region values/palette chips), inline rename +
+    recolor, delete with the server's refusal reason rendered VERBATIM.
+    Click-to-paint primary; drag a state onto a territory row OR legend
+    chip secondary (custom pointer-drag with ghost — both paths call the
+    same PUT). Canada blocks inert in edit mode, tooltip carries
+    "Canada editing lands in v2". Non-edit mode byte-identical to P5.
+  - **T1-D5 — Planning palette — SHIPPED as ruled:** 8 new
+    --color-terr-plan-* tokens (one notch more chromatic than the
+    canonical fills — planning reads as provisional; alarm/amber/flow
+    reserved as ever). ONE fill resolution (makeTerritoryFill in
+    UsMap.tsx): API color_token wins → canonical P5 mapping → sorted-code
+    pool index for tokenless runtime territories; map, legend, panel,
+    tooltip, and editor all render through it. BUILD FINDING, disclosed:
+    Tailwind v4 prunes @theme variables that never appear literally in
+    scanned source, so the token→var() map is written with literal names
+    (a constructed `var(--color-${token})` left every planning token
+    undefined — caught in the live browser walk, fixed, re-proven).
+    Disclosed payload addition (P3 precedent): the /api/metrics/states
+    roster row gains `color_token` (NULL on canonical territories → rep
+    rendering unchanged) so every role renders runtime territories
+    without the vp-only read.
+  - **T1-D6 — Seed canonical-geography restore — SHIPPED as ruled:** the
+    seed's final geography step DELETEs territory_states and re-INSERTs
+    the canonical 66 rows, single-sourced by extracting the INSERT from
+    the 0013 migration text via include_str! (never hand-copied), with a
+    hard 66-row check. NEW LAW recorded: geography survives ordinary
+    use; demo reset restores the canonical map (runtime territories die
+    with the territories truncate; their dangling state rows die here).
+    Plain row DML as the connection's user — no superuser assumption, so
+    the managed-prod TLS reset path behaves identically. Proven: edited
+    world (AL→NE-1, NM→ZZ-1 runtime territory) → seed → 66 rows, exact
+    Census distribution, ZZ-1 gone, zero color_tokens, anchors intact.
+  - **T1-D7 — metrics/states follows config LIVE — SHIPPED, one
+    disclosed query change:** the items' territory_code now joins
+    territory_states on the site's state (was: the order's territory_id
+    → territories.code) and total counts DISTINCT states — byte-identical
+    at canon (PRE-2's 100% alignment; p5's Σstate==Σterritory and
+    grouping tests still green), and a reassigned state regroups
+    immediately with no server-side geography caching. Zero-state /
+    zero-TM/RM territories verified (a just-created territory appears in
+    the roster with empty arrays; the editor lists it from the disclosed
+    read before it has states).
+  - **T1-D8 — Tests + tripwire — SHIPPED:** crates/api/tests/t1_http.rs
+    (3 tests): the rep+manager 403 matrix over every endpoint + 401s;
+    the PUT validation matrix; audit actor = acting user, repaint = zero
+    audit delta; THE PLANNING-VIEW LAW AS A TEST — Board feed
+    byte-identical across a reassignment while metrics/states regroups
+    with exact mirror sums (period=2023, a frozen year concurrent crm
+    bookings can't touch); create/patch/delete matrix incl. the
+    per-reason delete guard and the audited INSERT/UPDATE/DELETE trio.
+    Cross-process discipline, disclosed: cargo runs test binaries in
+    parallel, so T1's mutating tests and p5's roster-pinning states test
+    serialize on one Postgres advisory xact-lock (p5 gained the 6-line
+    acquisition — test maintenance, the deploy-unit precedent; app code
+    untouched). Canonical-restore-after-reseed is proven in the
+    verification gauntlet (a reseed inside a #[test] would nuke the
+    parallel suite's world). Tripwire: layout grows to 75 (adds
+    /map?edit=1 at 5 widths, VP session); scope grows to 7 (rep AND
+    manager: zero edit-affordance testids even with ?edit=1 forced; VP:
+    toggle/editor/banner present). 75/75 + 7/7 PASS.
+  - **T1-D9 — Forward-prep doc — COMMITTED:**
+    docs/territory-realignment-prep.md (commit-realignment semantics,
+    sub-state splits, non-state geographies, Canada v2). Whitespace
+    note: the unit prompt's doc blocks arrived with line breaks
+    stripped in transport; structure restored, content verbatim.
+  - **T1-D10 — Rejections honored, none re-decided:** no scenario/draft
+    tables · no free hex picker (tokens.css remains the only palette
+    source; the API validates against the same 8 names) · code is the
+    edit key, never territory id · Canada locked · managers excluded
+    (and tripwire-asserted + 403-tested).
+- **UI fixes found by the in-session browser walk (disclosed):** (i) edit
+  mode renders every territory's CONFIG fill regardless of the session's
+  cached scope list (a just-created territory isn't in the login-time
+  me.territories; money stays scope-gated); (ii) the paint handler's
+  isPending guard dropped fast successive clicks — removed (the server's
+  only-when-changed law makes repeats no-ops); (iii) the Tailwind v4
+  literal-token finding under D5.
+- **Out-of-scope observations (reported, not fixed):** (a) the local dev
+  .env now carries a REAL ANTHROPIC_API_KEY (P4-era; still untracked/
+  gitignored, nothing in the repo) — it was incidentally exposed into
+  this session's transcript during a PRE check, so ROTATE the key at the
+  console; (b) a 0-quota runtime territory renders "—" attainment via the
+  existing percent(null) path — no display breakage, no guard needed;
+  (c) MS has zero 2026-YTD dollars, so a GC-1 built from LA+MS shows
+  LA's sum alone — correct arithmetic, worth knowing before the
+  acceptance walk's check 5; (d) painting a US state INTO CE-1/CW-1 is
+  not blocked (the v1 lock is on Canada STATES, not targets) — harmless
+  in a planning view, flagged for the realignment unit.
+- **Verification (outputs in the session report):** PRE checks (schema
+  shapes, SELECT-only grant, role-gate path, territoryFill shape, no
+  /api/territories collision) · seed run with restore (66 rows, audit
+  157, anchors exact) · cargo sqlx prepare (committed) · check.sh ALL
+  CHECKS PASSED — 63 tests (12 domain + 7 validator + 22 prior HTTP + 8
+  signals + 7 ai + 4 p5 + 3 t1) · adversarial curl matrix (rep+manager
+  403 ×5 each; 404/422s verbatim; audit_log UPDATE/DELETE as plenum_app
+  → permission denied) · planning-law live proof (Board feed
+  byte-identical across GA→MT-1; GA row regrouped with identical
+  dollars; audit actor "Valerie Price | UPDATE | SE-1 -> MT-1") ·
+  browser-driven walk (toggle/banner/editor, paint GA, GC-1
+  create→paint LA+MS→SE-1 delete refusal verbatim→restore→GC-1 delete;
+  drag AL→NE-1 row with ghost; rep + ?edit=1 = zero affordances) · seed
+  restore proof · npm run build (main 423.70 kB < 500 kB) · tripwire
+  75/75 layout + 7 scope PASS.
+- **Anchors:** frozen set unchanged and re-proven post-0014 (orders
+  17353 / checksum 11556020473 · mv 120/195/1699/614 · ledger CUM NET
+  2467089087). NEW deterministic anchor: territory_states 66 at seed;
+  audit_log at seed print = 157 (supersedes 17 — the D1 disclosure).
+  CLOCK-DRIFTING: signals 40/12/28/168 = 248 on 2026-07-23.
+- **New dependencies: NONE.** Zero crates, zero npm packages.
+- **FIX (same session, pre-merge) — acceptance check 4 FAILED under D.'s
+  real mouse; drag rebuilt on pointer events, trusted-event red→green
+  proven.** Defect: a real mouse-down on a state shape started NATIVE
+  TEXT SELECTION (no preventDefault anywhere on the gesture), and
+  dragging toward the editor highlighted the panel text — the drag path's
+  in-session proof had used synthetic events, which trigger no native
+  default behavior, so it passed while a trusted mouse failed (that
+  proof class is now recorded INADMISSIBLE for gesture defects). Fix in
+  TerritoryMap/UsMap: pointerdown (was mousedown) with e.preventDefault()
+  — selection never starts; `click` still fires per the Pointer Events
+  spec, so click-to-paint is byte-identical — + setPointerCapture on the
+  originating shape, body user-select:none while a drag is armed
+  (restored on pointerup/pointercancel), touch-action:none on shapes in
+  edit mode, and the drop test hit-tests document.elementFromPoint
+  (with capture, event.target stays the shape). New standing spec
+  web/dragproof.spec.ts drives a REAL Playwright mouse (mouse.down →
+  incremental moves → mouse.up): RED against the pre-fix code
+  (isCollapsed === false — text selected, D.'s exact observation),
+  GREEN after (AL re-homed, ghost present mid-drag, zero selection,
+  trusted click-to-paint restore). playwright.config testMatch widened
+  to include it — it runs with every tripwire. Post-fix: full suite 63
+  green · tripwire 75/75 + 7 scope · dragproof green · geography
+  canonical (66, AL→SE-1). D.'s own re-drag re-owed before "merge".
+- **Phase gate: OPEN — awaiting D.** Session holds for D.'s acceptance
+  walk (the 8-check T1 acceptance in the unit prompt — check 4 re-run by
+  D.'s hand after the fix above) and the pre-authorized PHASE 2 merge on
+  D.'s literal "merge" in this session.
+
 ## 2026-07-22 · Deploy: PLENUM on Render (all-Render, one origin)
 
 - **Unit:** production deploy (one Render web service serving API + SPA,

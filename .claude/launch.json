@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "web"],
       "port": 5177
+    },
+    {
+      "name": "plenum-api",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "--bin", "api"],
+      "port": 5777
     }
   ]
 }

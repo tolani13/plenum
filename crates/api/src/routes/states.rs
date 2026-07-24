@@ -66,6 +66,11 @@ pub struct TerritoryRoster {
     tm_names: Vec<String>,
     rm_names: Vec<String>,
     state_codes: Vec<String>,
+    /// T1 (D5, disclosed payload addition): the planning-palette token a
+    /// runtime territory was created/recolored with. Canonical territories
+    /// carry NULL → the client's territoryFill falls back to the P5 mapping,
+    /// so canonical rendering (and every rep's DOM) is unchanged.
+    color_token: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -132,25 +137,30 @@ pub async fn states(
     let mut tx = rls_tx(&state.pool, &user).await?;
 
     // Money per state: v_order_facts (RLS) → sites (geographic key) →
-    // territory_states (config). The territory attribution is the ORDER's
-    // territory — the same authority every other metric uses; PRE-2 proved
-    // the state mapping and the order attribution agree on 100% of dollars.
+    // territory_states (config). T1 (D7): the row's territory_code comes
+    // from territory_states LIVE — the map is a planning view over geography
+    // config, so a reassigned state regroups immediately, with no
+    // server-side caching. Byte-identical at canon: PRE-2 proved 100% of
+    // every territory's ORDER-attributed dollars land inside its canonical
+    // state set, so the config join and the old order-territory join agree
+    // on every canonical row. The MONEY itself stays RLS-scoped through
+    // v_order_facts exactly as before — this changes grouping, never scope.
     let rows = sqlx::query_as!(
         StateAgg,
         r#"SELECT s.state AS "state_code!",
-                  t.code AS "territory_code!",
+                  ts.territory_code AS "territory_code!",
                   SUM(f.gross_cents)::bigint AS "gross_cents!",
                   SUM(f.net_cents)::bigint AS "net_cents!",
                   count(DISTINCT f.order_id) AS "order_count!"
            FROM v_order_facts f
            JOIN sites s ON s.id = f.site_id
-           JOIN territories t ON t.id = f.territory_id
+           JOIN territory_states ts ON ts.state_code = s.state
            WHERE ($1::date IS NULL OR f.ordered_on >= $1)
              AND ($2::date IS NULL OR f.ordered_on < $2)
              AND (NOT $3::boolean
                   OR f.ordered_on >= CURRENT_DATE - interval '12 months')
              AND ($4::text = 'all' OR f.kind::text = $4)
-           GROUP BY s.state, t.code
+           GROUP BY s.state, ts.territory_code
            ORDER BY CASE WHEN $5 = 'gross' THEN SUM(f.gross_cents)
                          ELSE SUM(f.net_cents) END DESC,
                     s.state
@@ -166,8 +176,11 @@ pub async fn states(
     .fetch_all(&mut *tx)
     .await?;
 
+    // T1: territory_states maps each state to exactly ONE territory (PK on
+    // state_code), so distinct states == distinct rows — the old
+    // (state, order-territory) pair key and this count agree at canon.
     let total: i64 = sqlx::query_scalar!(
-        r#"SELECT count(DISTINCT (s.state, f.territory_id)) AS "count!"
+        r#"SELECT count(DISTINCT s.state) AS "count!"
            FROM v_order_facts f
            JOIN sites s ON s.id = f.site_id
            WHERE ($1::date IS NULL OR f.ordered_on >= $1)
@@ -203,7 +216,8 @@ pub async fn states(
                             WHERE ta.territory_id = t.id), '{}') AS "rm_names!",
                   COALESCE((SELECT array_agg(ts.state_code ORDER BY ts.state_code)
                             FROM territory_states ts
-                            WHERE ts.territory_code = t.code), '{}') AS "state_codes!"
+                            WHERE ts.territory_code = t.code), '{}') AS "state_codes!",
+                  t.color_token
            FROM territories t
            ORDER BY t.code"#
     )
@@ -235,6 +249,7 @@ pub async fn states(
             tm_names: r.tm_names,
             rm_names: r.rm_names,
             state_codes: r.state_codes,
+            color_token: r.color_token,
         })
         .collect();
 

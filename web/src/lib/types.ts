@@ -460,6 +460,25 @@ export interface TerritoryRoster {
   tm_names: string[];
   rm_names: string[];
   state_codes: string[];
+  /** T1 (D5): planning-palette token for runtime territories; canonical
+   *  territories carry null → territoryFill's P5 fallback mapping. */
+  color_token: string | null;
+}
+
+// ── T1 — territory editing (planning view) — mirror routes/territories.rs ───
+
+export interface AdminTerritory {
+  id: string;
+  code: string;
+  name: string;
+  region: string;
+  quota_year_cents: number;
+  color_token: string | null;
+}
+
+export interface AssignedState {
+  state_code: string;
+  territory_code: string;
 }
 
 export interface StatesPage {
