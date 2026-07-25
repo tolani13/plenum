@@ -563,3 +563,132 @@ async fn refresh_rollups_is_admin_gated_and_stable() {
     .await;
     assert_eq!(before["items"], after["items"]);
 }
+
+// ═══ D-1 (2026-07-25) · the Items leaderboard must not stall ═══════════════
+//
+// The four shapes D. measured on the live site — 39.0 / 34.1 / 38.5 / 3.7 s
+// before this unit. The cause was the attach-rate LEFT JOIN LATERAL: it drove
+// the planner's cost estimate to 0.69M–12.05M, past jit_optimize_above_cost
+// and jit_inline_above_cost (500 000 each), so EVERY request LLVM-compiled
+// ~500 functions with full inlining and optimization before executing —
+// 83–97 % of the wall clock — on top of genuinely per-row unit scans.
+//
+// A wall-clock budget is the honest assertion here, not a plan-shape one: the
+// plan lives in the handler's SQL, and a test that re-declares that SQL would
+// stop guarding it the moment the two drift. The budget is set an order of
+// magnitude above the measured post-fix time (20–70 ms per shape on the dev
+// box) and an order of magnitude below the pre-fix time (1.1–1.8 s on the SAME
+// box), so it is decisive without being a stopwatch race:
+//
+//     shape                                pre-fix     post-fix    budget
+//     2026 · product · all                 1519 ms       69 ms      600 ms
+//     cumulative · product · all           1215 ms       64 ms      600 ms
+//     2026 · family · all                  1406 ms       51 ms      600 ms
+//     2026 · product · consumable          1103 ms       46 ms      600 ms
+//
+// This test is RED on the pre-fix handler and GREEN on the fixed one; both
+// states are pasted in the unit's report.
+const ITEMS_BUDGET_MS: u128 = 600;
+
+#[tokio::test]
+async fn items_answers_every_ui_shape_inside_budget() {
+    let app = test_app().await;
+    let vp = login(&app, VP_EMAIL).await;
+
+    // Every combination the Leaderboards controls can actually produce:
+    // period × basis × group × kind (the kind segment offers all/capital/
+    // consumable — 'part' and 'service' are not UI values and are a typed 422
+    // by design, spec §5).
+    let periods = ["2026", "cumulative", "2026-q2", "2025", "ttm"];
+    let groups = ["product", "family"];
+    let kinds = ["all", "capital", "consumable"];
+
+    let mut worst: (u128, String) = (0, String::new());
+    for period in periods {
+        for group in groups {
+            for kind in kinds {
+                let uri = format!(
+                    "/api/metrics/items?period={period}&basis=net&kind={kind}\
+                     &group={group}&limit=200"
+                );
+                let started = std::time::Instant::now();
+                let (status, page) = get(&app, Some(&vp), &uri).await;
+                let elapsed = started.elapsed().as_millis();
+                assert_eq!(status, StatusCode::OK, "{uri}");
+                // A slow shape is a failure even when it answers correctly.
+                assert!(
+                    elapsed <= ITEMS_BUDGET_MS,
+                    "{uri} took {elapsed} ms — over the {ITEMS_BUDGET_MS} ms budget"
+                );
+                // Budget met AND the payload still holds its contract.
+                assert_gross_covers_net(&page, &uri);
+                for row in items(&page) {
+                    if row["kind"] != "consumable" {
+                        assert!(
+                            row["attach_rate_pct"].is_null(),
+                            "{uri}: non-consumable row carries an attach rate"
+                        );
+                    }
+                }
+                if elapsed > worst.0 {
+                    worst = (elapsed, uri);
+                }
+            }
+        }
+    }
+    println!(
+        "items: slowest of {} shapes was {} ms — {}",
+        periods.len() * groups.len() * kinds.len(),
+        worst.0,
+        worst.1
+    );
+}
+
+#[tokio::test]
+async fn items_under_concurrency_still_answers() {
+    // D-2's server half: three concurrent Items requests on the live instance
+    // used to exhaust the free-tier Postgres and come back as typed 500s
+    // ("peer closed connection without sending TLS close_notify" in the API
+    // log — the backends were killed). The fix removes the per-request JIT
+    // compilation and the per-row unit scans that caused it; six at once must
+    // now all succeed.
+    //
+    // Honest about what this test is: a REGRESSION GUARD, not a reproduction.
+    // A dev box has the CPU and memory to survive the old query concurrently,
+    // so this passes on the pre-fix handler too — the failure only appears at
+    // the free instance's resource ceiling. The red→green evidence for the
+    // performance defect is items_answers_every_ui_shape_inside_budget above;
+    // the live 500s are evidenced in the unit's report by the Render log.
+    let app = test_app().await;
+    let vp = login(&app, VP_EMAIL).await;
+
+    let shapes = [
+        "/api/metrics/items?period=2026&basis=net&kind=all&group=product&limit=200",
+        "/api/metrics/items?period=cumulative&basis=net&kind=all&group=product&limit=200",
+        "/api/metrics/items?period=2026&basis=net&kind=all&group=family&limit=200",
+        "/api/metrics/items?period=cumulative&basis=net&kind=all&group=family&limit=200",
+        "/api/metrics/items?period=2025&basis=net&kind=all&group=product&limit=200",
+        "/api/metrics/items?period=ttm&basis=net&kind=all&group=product&limit=200",
+    ];
+
+    let started = std::time::Instant::now();
+    let mut handles = Vec::new();
+    for uri in shapes {
+        let app = app.clone();
+        let vp = vp.clone();
+        handles.push(tokio::spawn(async move {
+            get(&app, Some(&vp), uri).await.0
+        }));
+    }
+    for handle in handles {
+        assert_eq!(
+            handle.await.expect("task joins"),
+            StatusCode::OK,
+            "a concurrent items request failed"
+        );
+    }
+    println!(
+        "items: 6 concurrent requests all 200 in {} ms",
+        started.elapsed().as_millis()
+    );
+}

@@ -2,7 +2,14 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-23 — T1 Territory Map Editing (planning view): built
+## [LATEST] 2026-07-25 — D-1/D-2 fixed: the Items leaderboard paints in under
+2 s and the client no longer lies about why a request failed. Live demo path
+is clear end to end. Remaining audition-track items: collector (Artifact 1)
+into the repo at /collector + the telemetry bridge, live demo rehearsal,
+tag demo-live-20260725. Platform track (multi-tenancy et al.) is unapproved
+and forks to a private repo at the multi-tenancy migration, not before.
+
+## 2026-07-23 — T1 Territory Map Editing (planning view): built
 - T1 territory editing (planning view) shipped: VP/admin redraw the map
   (paint + drag), define territories, audited, planning-only; realignment
   commit + state splits + Canada editing recorded as future units in

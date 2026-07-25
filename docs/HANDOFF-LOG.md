@@ -4,6 +4,156 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-25 · D-1/D-2 — Items leaderboard performance + honest failure
+
+- **Unit:** fix, not a phase. Branch `fix-items-perf` from main `81eba71`.
+  Tier 2 (no auth, no tenancy rule, no money path changed) with a mandatory
+  scope proof, because `/api/metrics/items` is a scoped read.
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+- **The two defects, as D. found them by clicking around after the live
+  walk:** D-1 `/api/metrics/items` took 34–39 s on the live site; D-2 the
+  Items tab then showed "Couldn't reach the API." even though the API had
+  answered 200.
+
+- **EXPLAIN ANALYZE first, before any fix — and it re-aimed the
+  hypothesis.** The architect's prime suspect was the attach-rate
+  `LEFT JOIN LATERAL`. Profiling all four shapes on the frozen seed says:
+  **partly confirmed, and for the wrong reason.**
+  - The LATERAL *is* real per-row work: one `v_unit_facts` scan per
+    consumable row (16 scans, 841 unit-evaluations) plus a correlated
+    `EXISTS` per unit — 213 917 / 686 551 / 92 382 / 213 425 shared-buffer
+    hits for the four shapes. Real, but locally only 43–222 ms of it.
+  - **What actually dominated the clock was JIT.** The LATERAL pushed the
+    planner's cost estimate to 1 316 336 / 9 160 850 / 12 051 377 / 689 707
+    — every one past `jit_optimize_above_cost` AND `jit_inline_above_cost`
+    (500 000 each) — so **every single request** LLVM-compiled 464–563
+    functions with full inlining and optimization before executing a row.
+    Measured JIT share: 1519/1794, 1059/1289, 1402/1448, 1065/1134 ms —
+    **83–97 % of the wall clock**. Re-running the identical queries with
+    `SET LOCAL jit = off` collapsed them to 76 / 222 / 43 / 65 ms, which is
+    the isolation proof.
+  - **The consumable contradiction is resolved:** at the same period,
+    `kind=all` and `kind=consumable` do essentially identical attach work
+    (213 917 vs 213 425 buffers), so attach-rate volume cannot explain an
+    8–10× gap. What differs between them is plan size and therefore JIT tier
+    — shape 4's estimate (689 707) sits nearest the 500 000 threshold and
+    compiles the fewest functions (464 vs 551). The free instance's exact
+    tier could not be confirmed (its Postgres is IP-allowlisted and the
+    Render MCP path cannot reach it); the fix removes the question by
+    dropping every estimate below `jit_above_cost` entirely.
+- **Root cause D-1, one sentence:** the attach-rate LATERAL inflated the
+  items query's cost estimate past Postgres's JIT inlining/optimization
+  thresholds, so every request paid a full LLVM compilation of ~500
+  functions before it did any work — while also doing genuine per-row unit
+  scans.
+- **Root cause D-2, one sentence:** `TabPanel` rendered `<ErrorPanel>` with
+  no message, so `ErrorPanel`'s hardcoded default — "Couldn't reach the
+  API." — was shown for *every* failure, including the typed 500 the API
+  really returned; the error never reached the panel that had to describe
+  it.
+- **D-2's trigger, found in the live logs, not guessed.** A slow-but-200
+  response never produces an error state — proven three times (local 45 s
+  delay, live clean load 38 s, live click-around 79.5 s: pulse, then rows,
+  never an alarm). Three *concurrent* items requests on the live site,
+  however, all returned `500 {"error":{"code":"internal","message":"internal
+  error"}}` after 50 s, and the Render app log for that instant reads
+  `database error … peer closed connection without sending TLS
+  close_notify` + `Connection reset by peer (os error 104)` — the Postgres
+  backends were killed. The same signature appears at 2026-07-25T02:06:41Z,
+  the night D. was clicking around. So the API was right to return 500; the
+  client was wrong to call it a network problem.
+
+- **Fix, at each layer:**
+  - **SQL (Phase B preference 1 — make the per-row work unnecessary).** All
+    four items queries rewritten from `LEFT JOIN LATERAL … EXISTS` to a
+    set-based CTE chain: `page` (ORDER BY + LIMIT first), `fits`
+    (`unnest(filter_fits)`), `served` (one `DISTINCT` scan of
+    `v_order_facts`), `att` (one `v_unit_facts` scan, grouped). No index was
+    needed and no migration was written — the additive-index option
+    (preference 2) was not required once the per-row work was gone.
+  - **Client (Phase C — cause, not the string).** `lib/api.ts` gains a typed
+    `NetworkError` (fetch itself rejecting, or a body that cannot be read)
+    so a transport failure is distinguishable from an API answer, plus
+    `describeError()`. `ErrorPanel` takes the `error` and names the server's
+    typed code, message and status; `message` still overrides; the
+    no-argument fallback is now cause-agnostic ("Couldn't load this panel.")
+    instead of asserting connectivity it cannot know about. Leaderboards
+    passes `query.error` on all three tabs.
+- **Before → after, wall clock, same data, same box:**
+
+  | shape | cost before | cost after | before | after |
+  |---|---|---|---|---|
+  | 2026 · product · all | 1 316 336 | 20 691 | 1794.3 ms | 45.4 ms |
+  | cumulative · product · all | 9 160 850 | 20 638 | 1289.3 ms | 59.1 ms |
+  | 2026 · family · all | 12 051 377 | 20 707 | 1447.7 ms | 37.6 ms |
+  | 2026 · product · consumable | 689 707 | 20 073 | 1133.6 ms | 38.7 ms |
+
+  Every post-fix estimate is below `jit_above_cost` (100 000), so **no plan
+  contains a JIT section at all** — the tax is structurally gone, not tuned
+  away. Buffers fell 213 917→118 809, 686 551→118 486, 213 425→118 317
+  (family 92 382→94 823, flat). End-to-end through the router: 1.1–1.5 s →
+  14–69 ms across 30 shapes.
+- **Numeric identity:** 53 response bodies — VP and rep, gross and net, 13
+  period/kind/group combinations, a mid-set `offset` page, and the 422
+  cases — captured against the pre-fix binary and again against the fixed
+  one. `diff -r` is **empty**. Not one number, percentage, row order or
+  total moved.
+- **Band-Aid Test:** passed all six; the fix is at the layer where the cost
+  is created (the query shape) and where the lie is told (the panel that
+  renders the message), not at the symptom. Full answers in the unit report.
+- **Blast door:** VERDICT PASS. §2.2 scope proof (rep sees 19 rows /
+  $485,364.67 vs the VP's 29 / $3,916,141.44, byte-identical to pre-fix, a
+  strict subset; unknown `app.user_id` → 0 rows and 0 denominator, fail
+  closed), §2.8 availability (every changed query measured; nothing over
+  1 s), §2.10 client (no authorization decision moved client-side, nothing
+  cached). Identity / money / secrets / provenance: not required — no
+  surface.
+- **Regression anchors:** re-run after the fix, all sixteen exact — orders
+  17353 · order_lines 25497 · opportunities 16 / checksum 3367519569 ·
+  quotes 1 / quote_lines 3 · mv 120/195/1699/614 · audit_log 157 ·
+  territories 8 · territory_states 66 · users 17 · accounts 48 · sites 60 ·
+  contacts 107 · products 42 · installed_units 232. No seed change.
+- **Suites:** `cargo test` 65/65 · `cargo clippy --all-targets -D warnings`
+  clean · `SQLX_OFFLINE=true cargo check` clean (4 `.sqlx` entries out, 4
+  in) · web build main chunk 424.46 kB (< 500 kB law) · tripwire 75/75
+  layout + 7 scope + dragproof + the 3 new honest-error specs, 5 specs
+  passed.
+- **Not live yet:** autoDeploy is OFF by design. This fix reaches
+  https://plenum.onrender.com only on D.'s explicit redeploy, and a
+  redeploy signs everyone out (MemoryStore sessions).
+
+---
+
+## 2026-07-25 · T1 DEPLOY + LIVE ACCEPTANCE WALK (no code change)
+
+- **Unit:** operational, not a build. T1 (main `81eba71`) taken live and
+  walked under D.'s observation. No source file changed.
+- **Deploy:** manual deploy `dep-d9i0nljtqb8s73ad2ikg` triggered 2026-07-25
+  01:05 UTC, live 01:08 UTC — under 3 minutes. autoDeploy remains OFF by
+  design (render.yaml pins it, deploy-era ruling D9: a deploy restarts the
+  in-memory session store and would sign everyone out mid-demo).
+- **Migration 0014 applied in prod, PROVEN:** the prod reset printed
+  `audit_log 157` — the specific evidence the 0014 audit triggers are live
+  on the managed database. Every other regression anchor matched exactly.
+- **Live acceptance walk — 12 checks, ZERO failures**, driven in D.'s browser
+  under his observation:
+  1 VP login · 2 Territory Map renders (51 states + DC + Canada blocks) ·
+  3 Edit-map toggle present · 4 planning sums tie to Command to the cent ·
+  5 persisted write (AL → NE-1) survived a full reload ·
+  6 PLANNING-VIEW LAW held live (Command byte-identical while the map
+  regrouped) · 7 rep scope isolation (serena sees $485,364.67, not the VP's
+  $3,916,141.44) · 8 rep forcing `?edit=1` got ZERO edit affordances ·
+  9 direct write API as rep → `403 forbidden`, typed · 10 AI-off degrades
+  gracefully · 11 restore to canonical exact · 12 all screens render without
+  error.
+- **Verdict:** the gate on sharing the live link is CLOSED.
+- **Defects found immediately afterwards by D. clicking around** (two AI
+  audits and the walk itself missed both): D-1 `/api/metrics/items` 34–39 s;
+  D-2 the client claims "Couldn't reach the API" on a successful 200.
+  Both are the subject of the next unit.
+
+---
+
 ## 2026-07-23 · T1 — Territory Map Editing (planning view)
 
 - **Unit:** T1 (first post-ladder unit — NOT a phase): /map gains a

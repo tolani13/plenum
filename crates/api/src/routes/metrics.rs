@@ -600,21 +600,38 @@ pub async fn items(
     // carry site_id, units live at sites); denominator = all such units.
     // Both sides read v_unit_facts / v_order_facts, so RLS scoping is
     // inherited, and the empty-scope case yields 0/0 -> null, not an error.
+    //
+    // ── D-1 (2026-07-25): the attach numbers are computed SET-WISE ──────────
+    // These four queries used to hang the attach math off a
+    // `LEFT JOIN LATERAL (... WHERE EXISTS (SELECT 1 FROM v_order_facts ...))`
+    // evaluated once per result row. Two costs, both measured:
+    //   · the real per-row work — one v_unit_facts scan per consumable row
+    //     (v_unit_facts is itself a lateral over order_lines, so this
+    //     re-derived the unit's last-paid price 16× over) plus a correlated
+    //     EXISTS per unit: 213k–687k buffer touches per request;
+    //   · the one that actually dominated the clock — the LATERAL drove the
+    //     planner's cost estimate to 0.69M–12.05M, far past
+    //     jit_optimize_above_cost / jit_inline_above_cost (500 000), so every
+    //     single request LLVM-compiled ~460–560 functions with full inlining
+    //     and optimization BEFORE executing. That compilation was 83–97 % of
+    //     the wall clock (e.g. 1519 ms of 1794 ms locally; 34–39 s on the
+    //     free-tier instance), and three concurrent requests exhausted the
+    //     free Postgres and got their backends killed — the typed 500 behind
+    //     D-2.
+    // The rewrite reads v_unit_facts ONCE and v_order_facts ONCE and joins
+    // them set-wise. Scoping is unchanged and inherited exactly as before:
+    // both relations are still the same security_invoker facts views read
+    // inside the same rls_tx, so the 0005 policies apply to every row; the
+    // empty-scope case still produces no attach row at all -> COALESCE 0 ->
+    // 0/0 -> null (item_row), never an error and never everything.
+    // The attach CTEs are restricted to the requested PAGE, which is legal
+    // because the ORDER BY never reads an attach column.
     let (rows, total) = if rollup_path(period, kind) {
         let (start, end) = period.date_range().expect("rollup periods have a range");
         if group_by_family {
             let rows = sqlx::query_as!(
                 ItemAgg,
-                r#"SELECT NULL::text AS "product_sku?",
-                          r.family AS "product_name!",
-                          r.family AS "family!",
-                          r.kind AS "kind!",
-                          r.units AS "units!",
-                          r.gross_cents AS "gross_cents!",
-                          r.net_cents AS "net_cents!",
-                          att.numer AS "attach_numer!",
-                          att.denom AS "attach_denom!"
-                   FROM (
+                r#"WITH r AS (
                        SELECT family,
                               CASE WHEN count(DISTINCT kind) = 1
                                    THEN min(kind::text) ELSE 'mixed' END AS kind,
@@ -624,28 +641,54 @@ pub async fn items(
                        FROM v_product_period
                        WHERE quarter_start >= $1 AND quarter_start < $2
                        GROUP BY family
-                   ) r
-                   LEFT JOIN LATERAL (
-                       SELECT count(DISTINCT u.unit_id) AS denom,
-                              count(DISTINCT u.unit_id) FILTER (WHERE EXISTS (
-                                  SELECT 1 FROM v_order_facts f
-                                  WHERE f.site_id = u.site_id
-                                    AND f.family = r.family
-                                    AND f.ordered_on >= $1
-                                    AND f.ordered_on < $2
-                              )) AS numer
-                       FROM v_unit_facts u
-                       WHERE r.kind = 'consumable'
-                         AND u.unit_family IN (
-                             SELECT DISTINCT unnest(p2.filter_fits)
-                             FROM products p2
-                             WHERE p2.family = r.family
-                         )
-                   ) att ON true
-                   ORDER BY CASE WHEN $3 = 'gross' THEN r.gross_cents
-                                 ELSE r.net_cents END DESC,
-                            r.family
-                   LIMIT $4 OFFSET $5"#,
+                   ),
+                   page AS (
+                       SELECT r.* FROM r
+                       ORDER BY CASE WHEN $3 = 'gross' THEN r.gross_cents
+                                     ELSE r.net_cents END DESC,
+                                r.family
+                       LIMIT $4 OFFSET $5
+                   ),
+                   fits AS (
+                       SELECT DISTINCT pg.family, ff.unit_family
+                       FROM page pg
+                       JOIN products p2 ON p2.family = pg.family
+                       CROSS JOIN LATERAL unnest(p2.filter_fits) AS ff(unit_family)
+                       WHERE pg.kind = 'consumable'
+                   ),
+                   served AS (
+                       SELECT DISTINCT f.site_id, f.family
+                       FROM v_order_facts f
+                       WHERE f.ordered_on >= $1
+                         AND f.ordered_on < $2
+                         AND f.family IN (SELECT family FROM page
+                                          WHERE kind = 'consumable')
+                   ),
+                   att AS (
+                       SELECT fits.family,
+                              count(DISTINCT u.unit_id) AS denom,
+                              count(DISTINCT u.unit_id)
+                                  FILTER (WHERE s.site_id IS NOT NULL) AS numer
+                       FROM fits
+                       JOIN v_unit_facts u ON u.unit_family = fits.unit_family
+                       LEFT JOIN served s ON s.site_id = u.site_id
+                                         AND s.family = fits.family
+                       GROUP BY fits.family
+                   )
+                   SELECT NULL::text AS "product_sku?",
+                          pg.family AS "product_name!",
+                          pg.family AS "family!",
+                          pg.kind AS "kind!",
+                          pg.units AS "units!",
+                          pg.gross_cents AS "gross_cents!",
+                          pg.net_cents AS "net_cents!",
+                          COALESCE(att.numer, 0) AS "attach_numer!",
+                          COALESCE(att.denom, 0) AS "attach_denom!"
+                   FROM page pg
+                   LEFT JOIN att ON att.family = pg.family
+                   ORDER BY CASE WHEN $3 = 'gross' THEN pg.gross_cents
+                                 ELSE pg.net_cents END DESC,
+                            pg.family"#,
                 start,
                 end,
                 basis.as_str(),
@@ -667,16 +710,7 @@ pub async fn items(
         } else {
             let rows = sqlx::query_as!(
                 ItemAgg,
-                r#"SELECT r.product_sku AS "product_sku?",
-                          r.product_name AS "product_name!",
-                          r.family AS "family!",
-                          r.kind::text AS "kind!",
-                          r.units AS "units!",
-                          r.gross_cents AS "gross_cents!",
-                          r.net_cents AS "net_cents!",
-                          att.numer AS "attach_numer!",
-                          att.denom AS "attach_denom!"
-                   FROM (
+                r#"WITH r AS (
                        SELECT product_id, product_sku, product_name, family,
                               kind,
                               SUM(units)::bigint AS units,
@@ -686,25 +720,55 @@ pub async fn items(
                        WHERE quarter_start >= $1 AND quarter_start < $2
                        GROUP BY product_id, product_sku, product_name, family,
                                 kind
-                   ) r
-                   JOIN products p ON p.id = r.product_id
-                   LEFT JOIN LATERAL (
-                       SELECT count(DISTINCT u.unit_id) AS denom,
-                              count(DISTINCT u.unit_id) FILTER (WHERE EXISTS (
-                                  SELECT 1 FROM v_order_facts f
-                                  WHERE f.site_id = u.site_id
-                                    AND f.product_id = r.product_id
-                                    AND f.ordered_on >= $1
-                                    AND f.ordered_on < $2
-                              )) AS numer
-                       FROM v_unit_facts u
-                       WHERE r.kind = 'consumable'
-                         AND u.unit_family = ANY (p.filter_fits)
-                   ) att ON true
-                   ORDER BY CASE WHEN $3 = 'gross' THEN r.gross_cents
-                                 ELSE r.net_cents END DESC,
-                            r.product_sku
-                   LIMIT $4 OFFSET $5"#,
+                   ),
+                   page AS (
+                       SELECT r.* FROM r
+                       JOIN products p ON p.id = r.product_id
+                       ORDER BY CASE WHEN $3 = 'gross' THEN r.gross_cents
+                                     ELSE r.net_cents END DESC,
+                                r.product_sku
+                       LIMIT $4 OFFSET $5
+                   ),
+                   fits AS (
+                       SELECT DISTINCT pg.product_id, ff.unit_family
+                       FROM page pg
+                       JOIN products p ON p.id = pg.product_id
+                       CROSS JOIN LATERAL unnest(p.filter_fits) AS ff(unit_family)
+                       WHERE pg.kind = 'consumable'
+                   ),
+                   served AS (
+                       SELECT DISTINCT f.site_id, f.product_id
+                       FROM v_order_facts f
+                       WHERE f.ordered_on >= $1
+                         AND f.ordered_on < $2
+                         AND f.product_id IN (SELECT product_id FROM page
+                                              WHERE kind = 'consumable')
+                   ),
+                   att AS (
+                       SELECT fits.product_id,
+                              count(DISTINCT u.unit_id) AS denom,
+                              count(DISTINCT u.unit_id)
+                                  FILTER (WHERE s.site_id IS NOT NULL) AS numer
+                       FROM fits
+                       JOIN v_unit_facts u ON u.unit_family = fits.unit_family
+                       LEFT JOIN served s ON s.site_id = u.site_id
+                                         AND s.product_id = fits.product_id
+                       GROUP BY fits.product_id
+                   )
+                   SELECT pg.product_sku AS "product_sku?",
+                          pg.product_name AS "product_name!",
+                          pg.family AS "family!",
+                          pg.kind::text AS "kind!",
+                          pg.units AS "units!",
+                          pg.gross_cents AS "gross_cents!",
+                          pg.net_cents AS "net_cents!",
+                          COALESCE(att.numer, 0) AS "attach_numer!",
+                          COALESCE(att.denom, 0) AS "attach_denom!"
+                   FROM page pg
+                   LEFT JOIN att ON att.product_id = pg.product_id
+                   ORDER BY CASE WHEN $3 = 'gross' THEN pg.gross_cents
+                                 ELSE pg.net_cents END DESC,
+                            pg.product_sku"#,
                 start,
                 end,
                 basis.as_str(),
@@ -729,16 +793,7 @@ pub async fn items(
         if group_by_family {
             let rows = sqlx::query_as!(
                 ItemAgg,
-                r#"SELECT NULL::text AS "product_sku?",
-                          r.family AS "product_name!",
-                          r.family AS "family!",
-                          r.kind AS "kind!",
-                          r.units AS "units!",
-                          r.gross_cents AS "gross_cents!",
-                          r.net_cents AS "net_cents!",
-                          att.numer AS "attach_numer!",
-                          att.denom AS "attach_denom!"
-                   FROM (
+                r#"WITH r AS (
                        SELECT family,
                               CASE WHEN count(DISTINCT kind) = 1
                                    THEN min(kind::text) ELSE 'mixed' END AS kind,
@@ -752,30 +807,56 @@ pub async fn items(
                               OR ordered_on >= CURRENT_DATE - interval '12 months')
                          AND ($4::text = 'all' OR kind::text = $4)
                        GROUP BY family
-                   ) r
-                   LEFT JOIN LATERAL (
-                       SELECT count(DISTINCT u.unit_id) AS denom,
-                              count(DISTINCT u.unit_id) FILTER (WHERE EXISTS (
-                                  SELECT 1 FROM v_order_facts f
-                                  WHERE f.site_id = u.site_id
-                                    AND f.family = r.family
-                                    AND ($1::date IS NULL OR f.ordered_on >= $1)
-                                    AND ($2::date IS NULL OR f.ordered_on < $2)
-                                    AND (NOT $3::boolean
-                                         OR f.ordered_on >= CURRENT_DATE - interval '12 months')
-                              )) AS numer
-                       FROM v_unit_facts u
-                       WHERE r.kind = 'consumable'
-                         AND u.unit_family IN (
-                             SELECT DISTINCT unnest(p2.filter_fits)
-                             FROM products p2
-                             WHERE p2.family = r.family
-                         )
-                   ) att ON true
-                   ORDER BY CASE WHEN $5 = 'gross' THEN r.gross_cents
-                                 ELSE r.net_cents END DESC,
-                            r.family
-                   LIMIT $6 OFFSET $7"#,
+                   ),
+                   page AS (
+                       SELECT r.* FROM r
+                       ORDER BY CASE WHEN $5 = 'gross' THEN r.gross_cents
+                                     ELSE r.net_cents END DESC,
+                                r.family
+                       LIMIT $6 OFFSET $7
+                   ),
+                   fits AS (
+                       SELECT DISTINCT pg.family, ff.unit_family
+                       FROM page pg
+                       JOIN products p2 ON p2.family = pg.family
+                       CROSS JOIN LATERAL unnest(p2.filter_fits) AS ff(unit_family)
+                       WHERE pg.kind = 'consumable'
+                   ),
+                   served AS (
+                       SELECT DISTINCT f.site_id, f.family
+                       FROM v_order_facts f
+                       WHERE ($1::date IS NULL OR f.ordered_on >= $1)
+                         AND ($2::date IS NULL OR f.ordered_on < $2)
+                         AND (NOT $3::boolean
+                              OR f.ordered_on >= CURRENT_DATE - interval '12 months')
+                         AND f.family IN (SELECT family FROM page
+                                          WHERE kind = 'consumable')
+                   ),
+                   att AS (
+                       SELECT fits.family,
+                              count(DISTINCT u.unit_id) AS denom,
+                              count(DISTINCT u.unit_id)
+                                  FILTER (WHERE s.site_id IS NOT NULL) AS numer
+                       FROM fits
+                       JOIN v_unit_facts u ON u.unit_family = fits.unit_family
+                       LEFT JOIN served s ON s.site_id = u.site_id
+                                         AND s.family = fits.family
+                       GROUP BY fits.family
+                   )
+                   SELECT NULL::text AS "product_sku?",
+                          pg.family AS "product_name!",
+                          pg.family AS "family!",
+                          pg.kind AS "kind!",
+                          pg.units AS "units!",
+                          pg.gross_cents AS "gross_cents!",
+                          pg.net_cents AS "net_cents!",
+                          COALESCE(att.numer, 0) AS "attach_numer!",
+                          COALESCE(att.denom, 0) AS "attach_denom!"
+                   FROM page pg
+                   LEFT JOIN att ON att.family = pg.family
+                   ORDER BY CASE WHEN $5 = 'gross' THEN pg.gross_cents
+                                 ELSE pg.net_cents END DESC,
+                            pg.family"#,
                 start,
                 end,
                 ttm,
@@ -805,16 +886,7 @@ pub async fn items(
         } else {
             let rows = sqlx::query_as!(
                 ItemAgg,
-                r#"SELECT r.product_sku AS "product_sku?",
-                          r.product_name AS "product_name!",
-                          r.family AS "family!",
-                          r.kind::text AS "kind!",
-                          r.units AS "units!",
-                          r.gross_cents AS "gross_cents!",
-                          r.net_cents AS "net_cents!",
-                          att.numer AS "attach_numer!",
-                          att.denom AS "attach_denom!"
-                   FROM (
+                r#"WITH r AS (
                        SELECT product_id, product_sku, product_name, family,
                               kind,
                               SUM(qty)::bigint AS units,
@@ -828,27 +900,57 @@ pub async fn items(
                          AND ($4::text = 'all' OR kind::text = $4)
                        GROUP BY product_id, product_sku, product_name, family,
                                 kind
-                   ) r
-                   JOIN products p ON p.id = r.product_id
-                   LEFT JOIN LATERAL (
-                       SELECT count(DISTINCT u.unit_id) AS denom,
-                              count(DISTINCT u.unit_id) FILTER (WHERE EXISTS (
-                                  SELECT 1 FROM v_order_facts f
-                                  WHERE f.site_id = u.site_id
-                                    AND f.product_id = r.product_id
-                                    AND ($1::date IS NULL OR f.ordered_on >= $1)
-                                    AND ($2::date IS NULL OR f.ordered_on < $2)
-                                    AND (NOT $3::boolean
-                                         OR f.ordered_on >= CURRENT_DATE - interval '12 months')
-                              )) AS numer
-                       FROM v_unit_facts u
-                       WHERE r.kind = 'consumable'
-                         AND u.unit_family = ANY (p.filter_fits)
-                   ) att ON true
-                   ORDER BY CASE WHEN $5 = 'gross' THEN r.gross_cents
-                                 ELSE r.net_cents END DESC,
-                            r.product_sku
-                   LIMIT $6 OFFSET $7"#,
+                   ),
+                   page AS (
+                       SELECT r.* FROM r
+                       JOIN products p ON p.id = r.product_id
+                       ORDER BY CASE WHEN $5 = 'gross' THEN r.gross_cents
+                                     ELSE r.net_cents END DESC,
+                                r.product_sku
+                       LIMIT $6 OFFSET $7
+                   ),
+                   fits AS (
+                       SELECT DISTINCT pg.product_id, ff.unit_family
+                       FROM page pg
+                       JOIN products p ON p.id = pg.product_id
+                       CROSS JOIN LATERAL unnest(p.filter_fits) AS ff(unit_family)
+                       WHERE pg.kind = 'consumable'
+                   ),
+                   served AS (
+                       SELECT DISTINCT f.site_id, f.product_id
+                       FROM v_order_facts f
+                       WHERE ($1::date IS NULL OR f.ordered_on >= $1)
+                         AND ($2::date IS NULL OR f.ordered_on < $2)
+                         AND (NOT $3::boolean
+                              OR f.ordered_on >= CURRENT_DATE - interval '12 months')
+                         AND f.product_id IN (SELECT product_id FROM page
+                                              WHERE kind = 'consumable')
+                   ),
+                   att AS (
+                       SELECT fits.product_id,
+                              count(DISTINCT u.unit_id) AS denom,
+                              count(DISTINCT u.unit_id)
+                                  FILTER (WHERE s.site_id IS NOT NULL) AS numer
+                       FROM fits
+                       JOIN v_unit_facts u ON u.unit_family = fits.unit_family
+                       LEFT JOIN served s ON s.site_id = u.site_id
+                                         AND s.product_id = fits.product_id
+                       GROUP BY fits.product_id
+                   )
+                   SELECT pg.product_sku AS "product_sku?",
+                          pg.product_name AS "product_name!",
+                          pg.family AS "family!",
+                          pg.kind::text AS "kind!",
+                          pg.units AS "units!",
+                          pg.gross_cents AS "gross_cents!",
+                          pg.net_cents AS "net_cents!",
+                          COALESCE(att.numer, 0) AS "attach_numer!",
+                          COALESCE(att.denom, 0) AS "attach_denom!"
+                   FROM page pg
+                   LEFT JOIN att ON att.product_id = pg.product_id
+                   ORDER BY CASE WHEN $5 = 'gross' THEN pg.gross_cents
+                                 ELSE pg.net_cents END DESC,
+                            pg.product_sku"#,
                 start,
                 end,
                 ttm,

@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH r AS (\n                       SELECT family,\n                              CASE WHEN count(DISTINCT kind) = 1\n                                   THEN min(kind::text) ELSE 'mixed' END AS kind,\n                              SUM(qty)::bigint AS units,\n                              SUM(gross_cents)::bigint AS gross_cents,\n                              SUM(net_cents)::bigint AS net_cents\n                       FROM v_order_facts\n                       WHERE ($1::date IS NULL OR ordered_on >= $1)\n                         AND ($2::date IS NULL OR ordered_on < $2)\n                         AND (NOT $3::boolean\n                              OR ordered_on >= CURRENT_DATE - interval '12 months')\n                         AND ($4::text = 'all' OR kind::text = $4)\n                       GROUP BY family\n                   ),\n                   page AS (\n                       SELECT r.* FROM r\n                       ORDER BY CASE WHEN $5 = 'gross' THEN r.gross_cents\n                                     ELSE r.net_cents END DESC,\n                                r.family\n                       LIMIT $6 OFFSET $7\n                   ),\n                   fits AS (\n                       SELECT DISTINCT pg.family, ff.unit_family\n                       FROM page pg\n                       JOIN products p2 ON p2.family = pg.family\n                       CROSS JOIN LATERAL unnest(p2.filter_fits) AS ff(unit_family)\n                       WHERE pg.kind = 'consumable'\n                   ),\n                   served AS (\n                       SELECT DISTINCT f.site_id, f.family\n                       FROM v_order_facts f\n                       WHERE ($1::date IS NULL OR f.ordered_on >= $1)\n                         AND ($2::date IS NULL OR f.ordered_on < $2)\n                         AND (NOT $3::boolean\n                              OR f.ordered_on >= CURRENT_DATE - interval '12 months')\n                         AND f.family IN (SELECT family FROM page\n                                          WHERE kind = 'consumable')\n                   ),\n                   att AS (\n                       SELECT fits.family,\n                              count(DISTINCT u.unit_id) AS denom,\n                              count(DISTINCT u.unit_id)\n                                  FILTER (WHERE s.site_id IS NOT NULL) AS numer\n                       FROM fits\n                       JOIN v_unit_facts u ON u.unit_family = fits.unit_family\n                       LEFT JOIN served s ON s.site_id = u.site_id\n                                         AND s.family = fits.family\n                       GROUP BY fits.family\n                   )\n                   SELECT NULL::text AS \"product_sku?\",\n                          pg.family AS \"product_name!\",\n                          pg.family AS \"family!\",\n                          pg.kind AS \"kind!\",\n                          pg.units AS \"units!\",\n                          pg.gross_cents AS \"gross_cents!\",\n                          pg.net_cents AS \"net_cents!\",\n                          COALESCE(att.numer, 0) AS \"attach_numer!\",\n                          COALESCE(att.denom, 0) AS \"attach_denom!\"\n                   FROM page pg\n                   LEFT JOIN att ON att.family = pg.family\n                   ORDER BY CASE WHEN $5 = 'gross' THEN pg.gross_cents\n                                 ELSE pg.net_cents END DESC,\n                            pg.family",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_sku?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "product_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "family!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "kind!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "units!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "gross_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "net_cents!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "attach_numer!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "attach_denom!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Bool",
+        "Text",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      true,
+      true,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "bfe784fc7d552695487cb5b5f98e45d758a69521d72517176b83a1d6cb6d049e"
+}
