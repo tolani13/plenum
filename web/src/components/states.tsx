@@ -29,10 +29,14 @@ export function ErrorPanel({
   onRetry,
   error,
   message,
+  retryLabel = "Retry",
 }: {
   onRetry: () => void;
   error?: unknown;
   message?: string;
+  /** D-3: the error boundaries say "Try again" — plainer than "Retry" for a
+   *  failure the user did not cause and cannot read a status code about. */
+  retryLabel?: string;
 }) {
   const line =
     message ??
@@ -49,7 +53,7 @@ export function ErrorPanel({
         className="mt-3 inline-flex items-center gap-1.5 rounded border border-seam px-2.5 py-1.5 text-2xs text-text-dim transition-colors hover:bg-surface-2 hover:text-text"
       >
         <RotateCw size={13} strokeWidth={2} />
-        <span className="nameplate">Retry</span>
+        <span className="nameplate">{retryLabel}</span>
       </button>
     </div>
   );

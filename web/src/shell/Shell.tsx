@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import { useMe, useLogout } from "../auth/auth";
 import { ASK_FOCUS_EVENT } from "../lib/events";
+import { ErrorBoundary } from "../components/ErrorBoundary";
+import { RenderErrorProbe } from "../components/RenderErrorProbe";
 import { NewAccountDialog } from "./NewAccountDialog";
 
 function scopeLabel(territories: string[]): string {
@@ -171,8 +173,16 @@ export function Shell() {
         </div>
       </aside>
 
+      {/* D-3: every routed screen — the nine eager ones as much as the four
+          lazy ones — renders inside this boundary, so a render error costs
+          the content area and nothing else. resetKey = the pathname, so
+          navigating away always clears a caught error. The lazy routes carry
+          their own inner boundary (LazyRoute) with the chunk retry. */}
       <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
-        <Outlet />
+        <ErrorBoundary region="screen" resetKey={location.pathname}>
+          <RenderErrorProbe />
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       {newAccountOpen && (

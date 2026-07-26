@@ -113,6 +113,23 @@ Tripwire is now 75 layout (15 screens × 5 widths) + 7 scope
 (command/pipeline/signals/leakage/map — map = no foreign-territory dollars
 in a rep's DOM — plus rep AND manager zero-edit-affordance on /map) + 3
 honest-error specs (web/honest-errors.spec.ts).
+BLANK-SCREEN LAW: the app root and every lazily-loaded route sit inside an error boundary. A
+failed chunk download or any uncaught render error must render a named panel with a retry
+inside the surviving app shell — never an empty document. A new lazy route without a boundary
+above it is an incomplete change.
+D-3 implements it: web/src/components/ErrorBoundary.tsx (the only class component in the
+app — getDerivedStateFromError is React's sole render-time mechanism) at THREE layers —
+root (main.tsx, backstop above the router), screen (Shell's <Outlet/>, so the nav survives
+every routed screen), and per-lazy-route (LazyRoute.tsx). LazyRoute owns the four route
+loaders; adding a lazy route means adding a screenLoader + <LazyRoute>, never a bare
+lazy()/<Suspense>. Retry law, measured not assumed: React.lazy memoizes its rejection AND
+the browser's module map caches a failed module URL forever (a second import() of the same
+specifier issues no request at all), so a retry re-imports under a one-time ?d3-retry=N URL
+parsed from the error and same-origin-checked. When the failed screen's SHARED dep chunk is
+poisoned too (whole-network outage), no in-document re-import can win — the panel escalates
+to an explicit "Reload PLENUM" (second rung only, never automatic; a document reload keeps
+the session and the URL — the MemoryStore is server-side). Test hooks, permanent:
+plenum-test-render-error (screen boundary) and plenum-test-root-error (root boundary).
 Metrics layer: plenum_app has NO grant on raw mv_* rollups; all metric reads
 go through security_invoker facts views or scoped views carrying the
 v_user_scope fail-closed predicate; refresh only via refresh_rollups()

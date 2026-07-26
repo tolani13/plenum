@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { useEffect } from "react";
 import {
   Navigate,
   Route,
@@ -19,25 +19,27 @@ import { QuoteDetail } from "./crm/QuoteDetail";
 import { QuoteBuilder } from "./crm/QuoteBuilder";
 import { Account360 } from "./crm/Account360";
 import { Signals } from "./signals/Signals";
-import { LoadingPanel } from "./components/states";
+import { LazyRoute, screenLoader } from "./components/LazyRoute";
 
 // P5 (R7): the heavy routes load on demand — Ask + Leakage carry recharts,
 // the Map carries the state geometry — which puts the main chunk back under
 // Vite's 500 KB line. The fallback is the house loading panel.
-const Ask = lazy(() => import("./ask/Ask").then((m) => ({ default: m.Ask })));
-const TerritoryMap = lazy(() =>
-  import("./map/TerritoryMap").then((m) => ({ default: m.TerritoryMap })),
+//
+// D-3 (2026-07-26): the loaders are now module-scope constants handed to
+// <LazyRoute>, which owns the Suspense fallback AND an error boundary. The
+// old shape wrapped these in <Suspense> alone; a chunk that failed to
+// download rethrew during render, no boundary caught it, and React unmounted
+// the entire document. See components/ErrorBoundary.tsx.
+const loadAsk = screenLoader(() => import("./ask/Ask"), "Ask");
+const loadTerritoryMap = screenLoader(
+  () => import("./map/TerritoryMap"),
+  "TerritoryMap",
 );
-const Leakage = lazy(() =>
-  import("./leakage/Leakage").then((m) => ({ default: m.Leakage })),
+const loadLeakage = screenLoader(() => import("./leakage/Leakage"), "Leakage");
+const loadDataQuality = screenLoader(
+  () => import("./dq/DataQuality"),
+  "DataQuality",
 );
-const DataQuality = lazy(() =>
-  import("./dq/DataQuality").then((m) => ({ default: m.DataQuality })),
-);
-
-function Lazy({ children }: { children: React.ReactNode }) {
-  return <Suspense fallback={<LoadingPanel label="Loading" />}>{children}</Suspense>;
-}
 
 export function App() {
   const qc = useQueryClient();
@@ -66,20 +68,12 @@ export function App() {
           <Route path="/command" element={<Command />} />
           <Route
             path="/map"
-            element={
-              <Lazy>
-                <TerritoryMap />
-              </Lazy>
-            }
+            element={<LazyRoute load={loadTerritoryMap} name="Territory Map" />}
           />
           <Route path="/leaderboards" element={<Leaderboards />} />
           <Route
             path="/leakage"
-            element={
-              <Lazy>
-                <Leakage />
-              </Lazy>
-            }
+            element={<LazyRoute load={loadLeakage} name="Leakage" />}
           />
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/quotes" element={<Quotes />} />
@@ -87,21 +81,10 @@ export function App() {
           <Route path="/quotes/:id" element={<QuoteDetail />} />
           <Route path="/accounts/:id" element={<Account360 />} />
           <Route path="/signals" element={<Signals />} />
-          <Route
-            path="/ask"
-            element={
-              <Lazy>
-                <Ask />
-              </Lazy>
-            }
-          />
+          <Route path="/ask" element={<LazyRoute load={loadAsk} name="Ask" />} />
           <Route
             path="/data-quality"
-            element={
-              <Lazy>
-                <DataQuality />
-              </Lazy>
-            }
+            element={<LazyRoute load={loadDataQuality} name="Data Quality" />}
           />
         </Route>
       </Route>
