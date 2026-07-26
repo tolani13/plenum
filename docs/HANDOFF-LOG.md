@@ -110,6 +110,11 @@ One entry per build unit. Newest first.
 - **What D. must still do.** The eight B-1 acceptance checks under his own
   hands, then trigger the Render deploy (autoDeploy is off by design).
 
+- **Merged to main `5c3592b` at 2026-07-26T21:52:07Z** on D.'s "merge" order,
+  `--no-ff` from `collector-port` (`bba80c3`). Pushed to origin. The live site
+  will not carry the collector until the Render deploy is triggered. **B-2 —
+  the telemetry push and the reorder-card beat — is the next unit.**
+
 ---
 
 ## 2026-07-26 · D-4 — Lazy route to lazy route showed the previous screen
