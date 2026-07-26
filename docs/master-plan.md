@@ -2,7 +2,14 @@
 Product-level plan. All phase units reference this file and the spec
 (docs/plenum-crm-01.md, v01). Newest [LATEST] block wins; history below.
 
-## [LATEST] 2026-07-25 — D-1/D-2 fixed: the Items leaderboard paints in under
+## [LATEST] 2026-07-26 — B-1: the collector demo is in the repo, de-branded,
+served by PLENUM at /collector as a tenth screen and a fifth lazy route
+(three.js + drei ride their own 982 kB lazy chunk; the main chunk is
+428.39 kB, still under the 500 kB law). B-2 adds the telemetry push into the
+reorder branch — an admin-gated write, deliberately its own unit. Vendor and
+product-line names are gone; the industry vocabulary stays.
+
+## 2026-07-25 — D-1/D-2 fixed: the Items leaderboard paints in under
 2 s and the client no longer lies about why a request failed. Live demo path
 is clear end to end. Remaining audition-track items: collector (Artifact 1)
 into the repo at /collector + the telemetry bridge, live demo rehearsal,

@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   BarChart3,
+  Box,
   Columns3,
   FileText,
   LayoutDashboard,
@@ -137,6 +138,13 @@ export function Shell() {
             to="/data-quality"
             icon={<ListChecks size={15} strokeWidth={2} />}
             label="Data Quality"
+          />
+          {/* B-1: last in the rail, after Data Quality. Every role sees it —
+              the collector reads no scoped data and writes nothing. */}
+          <NavItem
+            to="/collector"
+            icon={<Box size={15} strokeWidth={2} />}
+            label="Collector"
           />
         </nav>
 

@@ -55,6 +55,9 @@ const STATIC_SCREENS = [
   { name: "signals", path: "/signals", auth: true },
   { name: "ask", path: "/ask", auth: true },
   { name: "data-quality", path: "/data-quality", auth: true },
+  // B-1: the collector demo's own checks 7 and 8 were responsive checks run by
+  // hand standalone; inside PLENUM they become five more assertions here.
+  { name: "collector", path: "/collector", auth: true },
 ] as const;
 
 async function loginAs(page: Page, email: string): Promise<void> {

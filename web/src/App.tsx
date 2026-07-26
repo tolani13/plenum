@@ -40,6 +40,14 @@ const loadDataQuality = screenLoader(
   () => import("./dq/DataQuality"),
   "DataQuality",
 );
+// B-1: the fifth lazy route. three.js + drei ride this chunk and never the
+// main one — the whole reason it is lazy (see the chunk table in the B-1
+// HANDOFF-LOG entry). Wired through the same screenLoader/LazyRoute pair as
+// the other four, so the BLANK-SCREEN and ROUTE-IDENTITY laws come free.
+const loadCollector = screenLoader(
+  () => import("./collector/Collector"),
+  "Collector",
+);
 
 export function App() {
   const qc = useQueryClient();
@@ -85,6 +93,10 @@ export function App() {
           <Route
             path="/data-quality"
             element={<LazyRoute load={loadDataQuality} name="Data Quality" />}
+          />
+          <Route
+            path="/collector"
+            element={<LazyRoute load={loadCollector} name="Collector" />}
           />
         </Route>
       </Route>
