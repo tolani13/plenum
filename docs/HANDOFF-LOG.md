@@ -98,6 +98,11 @@ One entry per build unit. Newest first.
   loop is possible, and neither is reachable from the nav. Not exercised by
   this unit; flagged for whoever touches those screens next.
 
+- **Merged to main `00c74c8` at 2026-07-26T19:33:56Z** on D.'s "merge" order,
+  `--no-ff` from `fix-lazy-nav` (`732a4db`). Pushed to origin. **The live site
+  is still serving the D-4 defect until the Render deploy is triggered** —
+  autoDeploy is off by design.
+
 ---
 
 ## 2026-07-26 · D-3 — A blank screen is now unreachable
