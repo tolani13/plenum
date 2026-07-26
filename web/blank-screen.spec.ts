@@ -52,6 +52,15 @@ const LAZY = [
     nav: "Data Quality",
     screen: "data-quality",
   },
+  // B-1: the fifth lazy route. Adding it here is the whole point of having
+  // built the matrix generatively — 12 ordered pairs become 20, and the
+  // chunk-failure spec below picks it up without a line being written.
+  {
+    path: "/collector",
+    module: "Collector",
+    nav: "Collector",
+    screen: "collector",
+  },
 ] as const;
 
 /** Eager screens, for the lazy→eager→lazy legs and the full-nav walk. */
@@ -74,6 +83,7 @@ const NAV_ORDER = [
   { nav: "Signals", screen: "signals" },
   { nav: "Ask", screen: "ask" },
   { nav: "Data Quality", screen: "data-quality" },
+  { nav: "Collector", screen: "collector" },
 ] as const;
 
 /** Click a nav link and wait for whatever screen ends up mounted to settle.
@@ -256,7 +266,7 @@ test("D-3: when the in-page retry cannot work, the panel escalates instead of ly
   await shellIsAlive(page);
 });
 
-test("D-3: on a healthy network all four lazy routes still load", async ({
+test("D-3: on a healthy network every lazy route still loads", async ({
   page,
 }) => {
   await loginAs(page, VP);
@@ -270,6 +280,43 @@ test("D-3: on a healthy network all four lazy routes still load", async ({
   }
 });
 
+// ── B-1: the collector route ───────────────────────────────────────────────
+
+test("B-1: /collector is behind the login wall, like the other nine", async ({
+  page,
+}) => {
+  // A brand-new route is a brand-new authorization point, even when the screen
+  // it renders reads nothing scoped and writes nothing at all.
+  await page.context().clearCookies();
+  await page.goto("/collector");
+  await page.waitForURL("**/login", { timeout: 20_000 });
+  await expect(page.getByTestId("login-email")).toBeVisible();
+  expect(await page.locator('[data-testid="collector-tab-unit"]').count()).toBe(
+    0,
+  );
+});
+
+test("B-1: every role reaches the collector — it is not scope-gated", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  // All four roles — rep, regional_manager, vp, admin. The collector reads no
+  // territory-scoped data, so every one of them sees the same screen; that is
+  // the intent, not an oversight.
+  for (const who of [
+    "serena.estes@plenum.demo", // rep
+    "marcus.reed@plenum.demo", // regional_manager
+    VP, // vp
+    "priya.nair@plenum.demo", // admin
+  ]) {
+    await page.context().clearCookies();
+    await loginAs(page, who);
+    await clickNav(page, "Collector");
+    expect(await mountedScreen(page), `${who} on /collector`).toBe("collector");
+    await expect(page.getByTestId("collector-tab-unit")).toBeVisible();
+  }
+});
+
 // ── D-4: route identity ────────────────────────────────────────────────────
 // Every ORDERED pair of the four lazy routes — 12 transitions, each one a
 // navigation from an already-mounted lazy screen, which is the case none of
@@ -278,7 +325,7 @@ test("D-3: on a healthy network all four lazy routes still load", async ({
 test("D-4: every ordered pair of lazy routes lands on the destination screen", async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(420_000); // B-1: five lazy routes -> 20 ordered pairs
   await loginAs(page, VP);
 
   const results: string[] = [];
@@ -308,14 +355,20 @@ test("D-4: every ordered pair of lazy routes lands on the destination screen", a
     }
   }
 
-  console.log("\nD-4 lazy -> lazy transitions (12):\n" + results.join("\n"));
-  expect(wrong, `wrong screen on ${wrong.length} of 12 transitions`).toEqual([]);
+  const pairs = LAZY.length * (LAZY.length - 1);
+  console.log(
+    `\nD-4 lazy -> lazy transitions (${pairs}):\n` + results.join("\n"),
+  );
+  expect(
+    wrong,
+    `wrong screen on ${wrong.length} of ${pairs} transitions`,
+  ).toEqual([]);
 });
 
 test("D-4: a lazy route reached via an eager route in between still lands right", async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   await loginAs(page, VP);
 
   const results: string[] = [];
@@ -378,10 +431,10 @@ test("D-4: one route's spent retry state does not follow you to the next route",
   await expect(back.getByRole("button", { name: "Try again" })).toBeVisible();
 });
 
-test("D-4: all nine nav destinations, top to bottom and back up", async ({
+test("D-4: all ten nav destinations, top to bottom and back up", async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   await loginAs(page, VP);
 
   const walk = [...NAV_ORDER, ...[...NAV_ORDER].reverse()];
@@ -396,6 +449,9 @@ test("D-4: all nine nav destinations, top to bottom and back up", async ({
     if (!ok) wrong.push(`${stop.nav} showed ${landed}`);
   }
 
-  console.log("\nD-4 full nav walk (9 down, 9 up):\n" + results.join("\n"));
+  console.log(
+    `\nD-4 full nav walk (${NAV_ORDER.length} down, ${NAV_ORDER.length} up):\n` +
+      results.join("\n"),
+  );
   expect(wrong).toEqual([]);
 });

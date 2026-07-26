@@ -4,6 +4,114 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-26 · B-1 — The collector demo, ported into PLENUM at /collector
+
+- **Unit:** new product surface, first of two bridge units. Branch
+  `collector-port` from main `a6e5aaa`. Tier 2: new client surface plus a
+  dependency change (§2.9 supply chain, §2.10 client). No endpoint, scoped
+  read, write, input, money, secret, external data or query — **the collector
+  makes no network call at all in this unit.** B-2 (the telemetry push into
+  the reorder branch) is NOT in this unit and will be Tier 3, because it
+  touches an admin-gated write.
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+
+- **What was ported.** Ten files from `C:\AI_Projects\Claude\camfil-apc-demo`
+  (left untouched — it remains D.'s standalone copy and the fallback) into
+  `web/src/collector/`, flat, mirroring `map/` and `leakage/`. The demo's
+  `App.tsx` became the SCREEN (`Collector.tsx`) — a tab switcher, not an app
+  root; its `main.tsx`, `index.html`, `index.css`, `vite.config.ts`,
+  `tsconfig.json`, `package-lock.json` and `node_modules` were not ported.
+  A new `materials.ts` bridges tokens.css to three.js.
+- **De-branded.** `grep -rn -i "camfil\|gold series\|interview concept"` over
+  `web/src`, `web/index.html` and `web/package.json` returns **nothing**. The
+  vendor name, the product line, the "interview concept" disclaimer and the
+  old page title are all gone; the tab title was already `PLENUM`. Industry
+  vocabulary stays on purpose — cartridge dust collector, pulse-jet, dP,
+  in. w.g., plenum, hopper, rotary discharge, NFPA, GSX-class.
+
+- **Palette: option (a), mapped onto existing tokens — and the reason is
+  evidence, not preference.** The two palettes turned out to be the SAME
+  design language: `graphite #0b0f14`, `panel #121a23`, `seam #23303d`,
+  `air #e8edf2`, `mist #8ca0b3`, `brand #19b36b`, `amber #f5b81c`,
+  `alarm #e5484d` and `flow #3e9bff` are **byte-identical** to PLENUM's
+  `--color-bg / surface / seam / text / text-dim / ok / warn / alarm / data`.
+  Only two things were genuinely new: `mist-2 #5f7284` (a third text step),
+  added as `--color-text-faint`; and the 3D unit's material values. A second
+  palette file would have duplicated nine identical hexes. Charts now pass
+  `var(--color-…)` strings exactly as `Ask` and `Leakage` already do — proven
+  in the rendered SVG, whose stroke attributes read
+  `["var(--color-data)", "var(--color-warn)"]`.
+- **The Tailwind v4 trap, found by looking at the screen rather than at the
+  tests.** Every automated check passed while **the 3D unit rendered as a
+  flat white blank**. Cause: Tailwind v4 emits only those `@theme` variables
+  that some utility class actually references. Nothing writes
+  `bg-coll-steel`, so all thirteen material tokens were tree-shaken out of
+  the stylesheet; `getPropertyValue` returned `""` and every three.js
+  material fell back to default white. Measured directly:
+
+  ```
+  --color-bg          in built CSS: 1   browser: "#0b0f14"
+  --color-text-faint  in built CSS: 1   browser: "#5f7284"
+  --color-coll-steel  in built CSS: 0   browser: ""
+  --color-coll-grid   in built CSS: 0   browser: ""
+  ```
+
+  Fix: the material tokens live in a plain `:root` block in tokens.css, not
+  in `@theme` — they are consumed by JS, never by a utility, so they never
+  belonged in `@theme`. tokens.css remains the single source and
+  `web/src/collector/` contains **zero** hex literals (grep pasted).
+
+- **Dependencies — four, all MIT, all version-verified against the registry
+  (not from memory):** `three@0.185.1`, `@react-three/fiber@9.6.1`,
+  `@react-three/drei@10.7.7`, `@types/three@0.185.1`. Peer ranges checked:
+  fiber wants `react >=19 <19.3` and PLENUM has 19.2.7 installed; drei wants
+  `three >=0.159` and `@react-three/fiber ^9.0.0`. `recharts` and
+  `lucide-react` were already present and are **reused, not duplicated** —
+  all ten icons the collector imports were confirmed to exist in PLENUM's
+  lucide-react 1.25.0 (the demo was on 0.525.0, a different major). Lockfile
+  committed. `npm audit` reports **one high finding, `react-router`, which
+  predates this unit and comes from none of the four** — see the BLAST DOOR
+  block.
+- **Bundle — the whole reason it is lazy:**
+
+  | chunk | before (a6e5aaa) | after |
+  |---|---|---|
+  | **index (main)** | **427.81 kB** | **428.39 kB** |
+  | BarChart (recharts, shared) | 352.15 kB | 354.73 kB |
+  | TerritoryMap | 65.76 kB | 65.76 kB |
+  | Leakage | 10.79 kB | 10.79 kB |
+  | Ask | 6.56 kB | 6.56 kB |
+  | DataQuality | 5.99 kB | 5.99 kB |
+  | **Collector (new)** | — | **982.08 kB** (gzip 266.53) |
+
+  The main chunk grew **0.58 kB** and stays under the 500 kB law. three.js and
+  drei are entirely inside the lazy Collector chunk. recharts is SHARED with
+  Leakage and Ask rather than duplicated (BarChart +2.58 kB, not +350). Vite
+  does warn about the 982 kB chunk; that is the lazy route, not main, and it
+  is a deliberate one-time cost on first click — recorded as an accepted
+  weakness rather than silenced.
+
+- **Evidence.** The demo's own 8 acceptance checks re-run at `/collector`
+  inside PLENUM, logged in as a **rep**: canvas 1166×646 with live dP moving
+  4.13″→4.22″ in 6 s on a `rgb(11,15,20)` page; exploded toggle flipping
+  "Exploded view"→"Assemble unit"; 4 hotspot markers, pulse card opening and
+  closing; dP climbing 4.30→4.42→4.56→4.58 then resetting to 3.90 with the
+  newest Event feed line reading **"Pulse cycle fired · dP reset to floor"**
+  (matching D.'s standalone 4.60→3.93); the 6.0″ service-limit label with
+  "Aug 16 (21 days out)"; and **0 px horizontal overflow at all seven of the
+  demo's own widths on both tabs, plus iPad in both orientations**. The orbit
+  DRAG and the pulse-flash COLOUR judgement are left to D. — a synthetic drag
+  is inadmissible under the T1 precedent, and a glow is a thing to be seen.
+  Suite: web **21/21** (tripwire now **80/80** layout — `/collector` added
+  five width assertions — plus 7 scope), API clippy clean and `cargo test`
+  **65 passed / 0 failed**. `/collector` is behind the login wall and reachable
+  by all four roles, both specs pasted.
+
+- **What D. must still do.** The eight B-1 acceptance checks under his own
+  hands, then trigger the Render deploy (autoDeploy is off by design).
+
+---
+
 ## 2026-07-26 · D-4 — Lazy route to lazy route showed the previous screen
 
 - **Unit:** regression fix. Branch `fix-lazy-nav` from main `1e26947`. Tier 2:

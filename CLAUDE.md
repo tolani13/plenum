@@ -143,6 +143,18 @@ screen. URL right, no error, wrong screen, hot loop. Never build a lazy() (or an
 whose identity matters) during a render that can suspend. Screens report themselves in
 body[data-screen] via useScreenReady(ready, screen) — required arg; assert navigation on
 that marker, never on the URL, which was correct throughout the D-4 defect.
+COLLECTOR-ORIGIN LAW: the collector demo is served by PLENUM from the same origin at
+/collector, as a lazy route through LazyRoute. It never gets its own origin, its own deploy,
+or an iframe — the session cookie is the reason, and CORS is the thing being avoided.
+B-1 ported it de-branded into web/src/collector/ (no vendor or product-line names; the
+industry vocabulary — cartridge, pulse-jet, dP, in. w.g., plenum, hopper, NFPA — stays).
+Simulator is self-contained and deterministic (seed 20260717), makes NO network call; the
+telemetry push into the reorder branch is B-2, an admin-gated write. Deps added: three,
+@react-three/fiber, @react-three/drei, @types/three (all MIT). three + the collector ride
+their own lazy chunk (982 kB) — main stays 428 kB. TAILWIND v4 GOTCHA, measured: @theme
+emits ONLY variables some utility class references, so tokens read from JS alone are
+tree-shaken to "" — the collector's 3D material tokens live in a plain :root block in
+tokens.css, not in @theme (in @theme the whole unit rendered white).
 Metrics layer: plenum_app has NO grant on raw mv_* rollups; all metric reads
 go through security_invoker facts views or scoped views carrying the
 v_user_scope fail-closed predicate; refresh only via refresh_rollups()

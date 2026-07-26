@@ -94,6 +94,14 @@
   --color-heat-3: #4e3a28;
   --color-heat-4: #56262c;
 
+  /* ---- B-1 · Collector demo --------------------------------------------
+     The collector arrived with its own eleven-colour theme. Nine of those
+     were already PLENUM tokens at the SAME hex — both surfaces were drawn
+     from the §8 control-room language, so mapping was the honest option and
+     no second palette was created. Exactly one UI colour was genuinely new:
+     a third text step below text-dim, for units and timestamps. */
+  --color-text-faint: #5f7284;
+
   /* ---- radius (2–4px — instrument corners, not pills) ------------------- */
   --radius-sm: 2px;
   --radius: 3px;
@@ -101,6 +109,35 @@
 
   /* ---- motion (150–250ms ease-out, no bounce) --------------------------- */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---- B-1 · the collector unit's MATERIALS --------------------------------
+   Physical-material values (painted steel, pleat media, a plastic drum), not
+   UI palette — but a colour VALUE may only live in this file, so here they
+   are. three.js cannot read a CSS variable, so collector/materials.ts
+   resolves these at runtime via getComputedStyle.
+
+   Declared in a plain :root block, NOT in @theme, and that is deliberate and
+   measured: Tailwind v4 emits only those @theme variables some utility class
+   actually references. Nothing writes `bg-coll-steel`, so inside @theme these
+   thirteen were tree-shaken straight out of the stylesheet — getPropertyValue
+   returned "" and every material fell back to three.js's default white (the
+   3D unit rendered as a white blank). They are consumed by JS, never by a
+   utility, so :root is where they belong. */
+:root {
+  --color-coll-steel: #6d7b88; /* housing, doors, ducting   */
+  --color-coll-steel-dark: #4c5864; /* plenum, legs, fittings    */
+  --color-coll-drum: #0e7a4a; /* collection drum           */
+  --color-coll-media: #c9a86a; /* pleated cartridge media   */
+  --color-coll-media-rib: #a8894f; /* pleat ribs                */
+  --color-coll-fitting: #2a333d; /* door handles              */
+  --color-coll-seam-line: #39434e; /* panel seams               */
+  --color-coll-plate: #aeb9c4; /* the riveted nameplate     */
+  --color-coll-grid: #1c2733; /* floor grid, major         */
+  --color-coll-grid-2: #141c25; /* floor grid, minor         */
+  --color-coll-light-sky: #cfe4ff; /* hemisphere light, sky     */
+  --color-coll-light-ground: #1a2129; /* hemisphere light, ground  */
+  --color-coll-light-fill: #7fb4ff; /* cool fill light           */
 }
 
 /* ---- base ---------------------------------------------------------------- */
@@ -187,6 +224,23 @@
   overflow-x: auto;
   overflow-y: hidden;
   max-width: 100%;
+}
+
+/* B-1: the collector's status LED — a lit pilot lamp, the one place a glow is
+   allowed (it is depicting a physical indicator, not decorating a surface). */
+@utility led {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--color-ok);
+  box-shadow: 0 0 8px 1px color-mix(in srgb, var(--color-ok) 70%, transparent);
+}
+@utility led-warn {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--color-warn);
+  box-shadow: 0 0 8px 1px color-mix(in srgb, var(--color-warn) 70%, transparent);
 }
 
 /* A quiet pulse for loading panels (no spinners on the instruments). */
