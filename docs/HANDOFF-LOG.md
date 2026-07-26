@@ -132,6 +132,12 @@ One entry per build unit. Newest first.
 - **Out of scope, reported not fixed:** the ten `ErrorPanel` call sites that
   still pass no `error` object (known and accepted since D-2) are untouched.
 
+- **Merged to main `b74672b` at 2026-07-26T16:30:10Z** on D.'s "merge" order,
+  `--no-ff` from `fix-blank-screen` (`7c1bbc2` red state → `5aff1a4` fix).
+  Pushed to origin. The live service tracks main, but **autoDeploy is off by
+  design** — D. triggers the Render deploy deliberately, then runs acceptance
+  check 6 on the live site.
+
 ---
 
 ## 2026-07-25 · D-1/D-2 — Items leaderboard performance + honest failure
