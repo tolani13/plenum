@@ -121,6 +121,13 @@ One entry per build unit. Newest first.
 - **Not live yet:** autoDeploy is OFF by design. This fix reaches
   https://plenum.onrender.com only on D.'s explicit redeploy, and a
   redeploy signs everyone out (MemoryStore sessions).
+- **Accepted + merged:** D.'s literal "merge" reply 2026-07-25 (merge =
+  approval per the unit's pre-authorized PHASE 2). Merge commit `d1aad0f`
+  (--no-ff) on main, 2026-07-25 20:11:53 −04:00, pushed to origin
+  (`81eba71..d1aad0f`); staleness check passed — origin/main was still
+  `81eba71` at merge time. Branch `fix-items-perf` (`d70b9ef`) kept. The
+  eight acceptance checks stay OWED to D.'s own hands and cannot run until
+  the service is redeployed.
 
 ---
 
