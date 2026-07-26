@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useMe, useLogout } from "../auth/auth";
 import { ASK_FOCUS_EVENT } from "../lib/events";
+import { RenderErrorProbe } from "../components/RenderErrorProbe";
 import { NewAccountDialog } from "./NewAccountDialog";
 
 function scopeLabel(territories: string[]): string {
@@ -172,6 +173,7 @@ export function Shell() {
       </aside>
 
       <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
+        <RenderErrorProbe />
         <Outlet />
       </main>
 

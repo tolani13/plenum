@@ -5,3 +5,13 @@
 
 /** Re-focus event the Shell fires on Cmd-K/Ctrl-K when already on /ask. */
 export const ASK_FOCUS_EVENT = "plenum:ask-focus";
+
+// D-3 (2026-07-26): the acceptance hook for the blank-screen blast door. One
+// line in the console —
+//   window.dispatchEvent(new Event('plenum-test-render-error'))
+// — makes a component throw DURING RENDER, which is the only way to exercise
+// an error boundary from outside React. Deliberately un-namespaced: D. types
+// it by hand. It arms nothing until fired, and the boundary it proves is the
+// same one that catches real failures.
+/** Forces an uncaught render error, for proving the error boundaries. */
+export const RENDER_ERROR_EVENT = "plenum-test-render-error";
