@@ -4,6 +4,136 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-26 · D-3 — A blank screen is now unreachable
+
+- **Unit:** defect fix, not a phase. Branch `fix-blank-screen` from main
+  `98a744f`. Tier 2: client rendering only — no endpoint, no scoped read, no
+  write, no query, no money, no secret, no dependency, no identity. Nothing
+  about authorization or scope is in play.
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+
+- **The defect, as D. found it.** Not from a test and not from a report —
+  **D. found it running acceptance check 7 on the live site on 2026-07-26**.
+  Wi-Fi off, click LEAKAGE on `plenum.onrender.com`, and **the entire
+  document went empty**: no nav, no PLENUM header, no user badge, black
+  viewport, URL still `/leakage`. **The reproduction was captured in his own
+  browser**, console reading:
+
+  ```
+  [EXCEPTION] (https://plenum.onrender.com/assets/index-uPPySGuq.js:8:64916)
+  TypeError: Failed to fetch dynamically imported module:
+  https://plenum.onrender.com/assets/Leakage-Bnf7PrT6.js
+  ```
+
+  Recovery required a manual page reload. Screenshot confirmed by D.
+
+- **Root cause, one sentence:** `React.lazy` rethrows a rejected dynamic
+  `import()` during render and `<Suspense>` has no error path, so with no
+  error boundary anywhere in `web/src` the failure reached the root and React
+  unmounted the whole tree — which is a blank document, not a broken screen.
+
+- **Reproduced before it was fixed, in dev, measured both ways.** Same page,
+  before and after the click: **275 elements → 2**, `document.body.innerHTML`
+  **87 bytes**, body text empty, nav gone, same console exception as D.'s live
+  capture. The same collapse — 275 → 2 — happens for *any* uncaught render
+  error, which is why this was never only a Leakage-offline bug. Both red
+  states are the commit `D-3 RED` on this branch: the spec and the probe
+  landed first, with no boundaries, and 6 of its 7 specs failed.
+
+- **The fix, at each layer.** One reusable class component
+  (`components/ErrorBoundary.tsx` — `getDerivedStateFromError` /
+  `componentDidCatch` are the only render-time mechanism React offers, so this
+  is the lowest available layer on the client), mounted three times:
+  - **root** (`main.tsx`) — above the router and the providers; catches what
+    no screen boundary can see (the Shell itself, RequireAuth, Login).
+  - **screen** (`Shell.tsx`, around `<Outlet/>`) — every routed screen, the
+    nine eager ones as much as the four lazy ones, so the nav survives.
+    `resetKey` = the pathname, so navigating away always clears the panel.
+  - **per lazy route** (`components/LazyRoute.tsx`) — owns the Suspense
+    fallback, the boundary and the retry for each of the four lazy screens.
+    `App.tsx` no longer holds a bare `lazy()`/`<Suspense>` anywhere.
+- **Message honesty (the D-2 law, applied to a new class of failure).** A
+  chunk that did not download is NOT an API failure, so it must not borrow the
+  API's wording and must never claim the API was unreachable — the API may be
+  perfectly healthy. `describeRenderError` reuses `describeError` from
+  `lib/api.ts` verbatim for `ApiError`/`NetworkError`, and adds distinct
+  branches for a chunk-load failure and a plain render error.
+  `describeRootError` is separate for the same reason: at the root there is no
+  screen, so saying "this screen" would be the D-2 mistake in a new place.
+  Buttons stay plain — "Try again", never a stack trace. **No D-2 string
+  changed**; `honest-errors.spec.ts` still passes 3/3.
+
+- **The retry took two measurements to get right, and the first design was
+  wrong.** A fresh `lazy()` per attempt is necessary but NOT sufficient:
+  - `React.lazy` memoizes its promise — a rejected lazy object rethrows the
+    same error forever, so a keyed re-mount alone changes nothing.
+  - **The browser's module map caches the failure against the URL.** Proven
+    directly, bypassing React: after an aborted load of
+    `/src/leakage/Leakage.tsx`, a second `import()` of the identical specifier
+    **issued no network request at all** and rejected instantly, while the
+    same file with a query string appended fetched and resolved. So a keyed
+    re-mount cannot work either — **the URL has to change**.
+
+    ```
+    1 plain, offline      : REJECT: Failed to fetch dynamically imported module: .../Leakage.tsx
+    2 plain, back online  : REJECT: Failed to fetch dynamically imported module: .../Leakage.tsx
+    3 ?d3=1, back online  : OK: Leakage
+    requests the page actually made:
+       ABORT http://127.0.0.1:5177/src/leakage/Leakage.tsx
+       PASS  http://127.0.0.1:5177/src/leakage/Leakage.tsx?d3-retry=1
+    ```
+  So the retry re-imports the failed module under a one-time
+  `?d3-retry=N` URL, taken from the URL the browser names in its own error and
+  accepted only if it is same-origin. Vite's static, analyzable `import()`
+  stays the normal path, so route chunking is untouched.
+- **The limit of an in-page retry, measured against the PRODUCTION build, not
+  reasoned about.** With the whole network down the screen's chunk is not the
+  only casualty — its shared dependency chunk dies with it
+  (`Leakage-*.js` **and** `BarChart-*.js`, recharts). Re-importing the screen
+  under a busted URL re-fetches the screen, but its own static import of
+  `./BarChart-*.js` resolves to the UNbusted URL, whose failure the module map
+  still remembers. Nothing inside the document can clear that. **So the panel
+  escalates rather than lying:** first press re-imports (recovers the common
+  case, no reload); if that fails too, the button becomes an explicit
+  **"Reload PLENUM"** — never automatic, always the user's press. That reload
+  was verified to cost nothing: session and URL both survive it in dev and in
+  the production shape (the MemoryStore is server-side — a reload restarts the
+  page, not the API; only an API restart or `demo-reset.ps1` signs anyone out).
+- **Test hooks, permanent and documented**, because a boundary can only be
+  proven by a throw during render: `plenum-test-render-error` (screen
+  boundary — panel appears inside the shell) and `plenum-test-root-error`
+  (root boundary — panel replaces the page, document never empty).
+
+- **Evidence.**
+  - `blank-screen.spec.ts` — 9 specs, red then green: four lazy routes each
+    losing their chunk, an uncaught render error under the shell, one above
+    it, the retry, the escalation, and all four routes on a healthy network.
+  - Full web suite **14/14** (tripwire 75 layout + 7 scope, dragproof,
+    honest-errors 3/3, blank-screen 9). API: `cargo clippy --all-targets -D
+    warnings` clean, `cargo test` **65 passed / 0 failed**.
+  - Production-shape walk (built chunks served by the API's `WEB_DIST` tier,
+    the Render shape): offline → panel with the shell alive (94 elements, nav
+    present) → "Try again" → honest escalation → "Reload PLENUM" → Leakage
+    renders (2147 elements), still signed in, still on `/leakage`.
+  - Build: main bundle **427.42 kB**, under the 500 kB law with 72 kB of
+    headroom; the four route chunks are unchanged (5.98 / 6.55 / 10.78 /
+    65.75 kB) and no size warning is emitted.
+
+- **What D. must still do.** Run the six D-3 acceptance checks under his own
+  hands — checks 1–5 in dev on 127.0.0.1:5177 (DevTools → Network → Offline on
+  LEAKAGE and on TERRITORY MAP, the retry, the three healthy routes, and the
+  console one-liner), then trigger the Render deploy deliberately (autoDeploy
+  is off by design) and run check 6 on the live site. **Note for check 2:** in
+  dev only the screen's own module dies, so one press of "Try again" loads
+  Leakage — measured, no reload, no re-login. On a real whole-network outage
+  against the built bundle the first press may not be enough and the button
+  becomes "Reload PLENUM"; that is the designed second rung, not a failure.
+
+- **Out of scope, reported not fixed:** the ten `ErrorPanel` call sites that
+  still pass no `error` object (known and accepted since D-2) are untouched.
+
+---
+
 ## 2026-07-25 · D-1/D-2 — Items leaderboard performance + honest failure
 
 - **Unit:** fix, not a phase. Branch `fix-items-perf` from main `81eba71`.

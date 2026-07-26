@@ -20,7 +20,10 @@
 // Requires the API on 127.0.0.1:5777 (this dev server only proxies to it).
 
 import { test, expect, type Page } from "@playwright/test";
-import { RENDER_ERROR_EVENT } from "./src/lib/events";
+import {
+  RENDER_ERROR_EVENT,
+  ROOT_RENDER_ERROR_EVENT,
+} from "./src/lib/events";
 
 const PASSWORD = "demo-plenum-2026";
 const VP = "valerie.price@plenum.demo";
@@ -107,6 +110,32 @@ test("D-3: an uncaught render error renders a panel inside the shell, never an e
   await shellIsAlive(page);
 });
 
+test("D-3: an error ABOVE the shell hits the root boundary — a panel, not an empty document", async ({
+  page,
+}) => {
+  await loginAs(page, VP);
+  await page.waitForSelector('body[data-screen-ready="true"]', {
+    timeout: 30_000,
+  });
+
+  // Nothing renders outside this one. The shell goes — it is what failed —
+  // but the document must not.
+  await page.evaluate(
+    (name) => window.dispatchEvent(new Event(name)),
+    ROOT_RENDER_ERROR_EVENT,
+  );
+
+  const panel = page.getByTestId("error-boundary");
+  await expect(panel).toBeVisible({ timeout: 10_000 });
+  await expect(panel).toHaveAttribute("data-region", "app root");
+  expect(
+    (await panel.getByTestId("error-message").textContent()) ?? "",
+  ).toContain("PLENUM failed to render");
+  expect((await page.locator("body").innerText()).trim().length).toBeGreaterThan(
+    20,
+  );
+});
+
 test("D-3: retry after the network returns loads the screen, with no page reload", async ({
   page,
 }) => {
@@ -146,6 +175,30 @@ test("D-3: retry after the network returns loads the screen, with no page reload
     ),
   ).toBe(true);
   expect(attempts).toBeGreaterThan(1);
+});
+
+test("D-3: when the in-page retry cannot work, the panel escalates instead of lying", async ({
+  page,
+}) => {
+  await loginAs(page, VP);
+
+  // Nothing about Leakage ever downloads — the case where the screen chunk's
+  // shared dependency is poisoned too and no in-document re-import can win.
+  await page.route(chunkOf("Leakage"), (r) => r.abort("failed"));
+  await page.getByRole("link", { name: "Leakage", exact: true }).click();
+
+  const panel = page.getByTestId("error-boundary");
+  await expect(panel).toBeVisible({ timeout: 20_000 });
+  await panel.getByRole("button", { name: "Try again" }).click();
+
+  // Second failure: the button becomes the one thing that CAN work, and the
+  // sentence says what it will do rather than asking for the same press again.
+  await expect(
+    panel.getByRole("button", { name: "Reload PLENUM" }),
+  ).toBeVisible({ timeout: 20_000 });
+  const line = (await panel.getByTestId("error-message").textContent()) ?? "";
+  expect(line).toContain("stay signed in");
+  await shellIsAlive(page);
 });
 
 test("D-3: on a healthy network all four lazy routes still load", async ({

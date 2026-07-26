@@ -13,5 +13,12 @@ export const ASK_FOCUS_EVENT = "plenum:ask-focus";
 // an error boundary from outside React. Deliberately un-namespaced: D. types
 // it by hand. It arms nothing until fired, and the boundary it proves is the
 // same one that catches real failures.
-/** Forces an uncaught render error, for proving the error boundaries. */
+/** Forces an uncaught render error under the SHELL — proves the screen
+ *  boundary: the panel appears where the screen was, the nav stays put. */
 export const RENDER_ERROR_EVENT = "plenum-test-render-error";
+
+/** Forces one ABOVE the shell — proves the root boundary, the backstop that
+ *  catches what no screen boundary can see (the Shell itself, RequireAuth,
+ *  Login, the router). The panel replaces the page; the document is never
+ *  empty, which is the whole law. */
+export const ROOT_RENDER_ERROR_EVENT = "plenum-test-root-error";
