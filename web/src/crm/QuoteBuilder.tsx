@@ -140,7 +140,7 @@ export function QuoteBuilder() {
     (opps.isSuccess || opps.isError) &&
     (products.isSuccess || products.isError) &&
     (policy.isSuccess || policy.isError);
-  useScreenReady(ready);
+  useScreenReady(ready, "quote-builder");
 
   const opp = opps.data?.items.find((o) => o.id === oppId);
   const catalog = useMemo(

@@ -147,7 +147,7 @@ export function Leakage() {
   const navigate = useNavigate();
   const [heatHover, setHeatHover] = useState<string | null>(null);
 
-  useScreenReady(query.isSuccess || query.isError);
+  useScreenReady(query.isSuccess || query.isError, "leakage");
 
   const patch = (p: Record<string, string>) => {
     const sp = new URLSearchParams(params);

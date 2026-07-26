@@ -129,7 +129,20 @@ parsed from the error and same-origin-checked. When the failed screen's SHARED d
 poisoned too (whole-network outage), no in-document re-import can win — the panel escalates
 to an explicit "Reload PLENUM" (second rung only, never automatic; a document reload keeps
 the session and the URL — the MemoryStore is server-side). Test hooks, permanent:
-plenum-test-render-error (screen boundary) and plenum-test-root-error (root boundary).
+plenum-test-render-error (screen boundary) and plenum-test-root-error (root boundary) —
+both ship in the production bundle, mounted unconditionally (accepted: D. needs the first
+for the live acceptance check).
+ROUTE-IDENTITY LAW (D-4): LazyRoute keys its inner component on the pathname, applied
+inside LazyRoute so a new lazy route cannot forget it, and its lazy() components come
+from the module-level lazyFor cache — NEVER built during render. D-3 shipped one
+component type serving four routes with lazy() inside a useMemo, and a suspending render
+never commits, so every retry rebuilt the memo, made a new lazy(), re-imported and
+suspended again: measured 8 572 renders / 4 286 loader calls in 4 s, still climbing at
+22 506 / 11 253, while React Router's transition kept <Suspense> showing the PREVIOUS
+screen. URL right, no error, wrong screen, hot loop. Never build a lazy() (or anything
+whose identity matters) during a render that can suspend. Screens report themselves in
+body[data-screen] via useScreenReady(ready, screen) — required arg; assert navigation on
+that marker, never on the URL, which was correct throughout the D-4 defect.
 Metrics layer: plenum_app has NO grant on raw mv_* rollups; all metric reads
 go through security_invoker facts views or scoped views carrying the
 v_user_scope fail-closed predicate; refresh only via refresh_rollups()

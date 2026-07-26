@@ -60,6 +60,7 @@ export function QuoteDetail() {
 
   useScreenReady(
     (quote.isSuccess || quote.isError) && (policy.isSuccess || policy.isError),
+    "quote-detail",
   );
 
   if (quote.isLoading) return <LoadingPanel label="Loading quote" />;

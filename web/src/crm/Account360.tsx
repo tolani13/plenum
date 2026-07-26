@@ -173,7 +173,7 @@ function ActivityLog({ accountId }: { accountId: string }) {
 export function Account360() {
   const { id } = useParams();
   const account = useAccountDetail(id);
-  useScreenReady(account.isSuccess || account.isError);
+  useScreenReady(account.isSuccess || account.isError, "account-360");
 
   if (account.isLoading) return <LoadingPanel label="Loading account" />;
   if (account.isError || !account.data)

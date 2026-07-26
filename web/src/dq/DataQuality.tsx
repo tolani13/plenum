@@ -55,7 +55,7 @@ function TerritoryChip({ code }: { code: string }) {
 export function DataQuality() {
   const me = useMe();
   const query = useDataQuality();
-  useScreenReady(query.isSuccess || query.isError);
+  useScreenReady(query.isSuccess || query.isError, "data-quality");
 
   if (query.isLoading) return <LoadingPanel label="Scanning the book" />;
   if (query.isError)

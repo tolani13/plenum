@@ -11,7 +11,7 @@ import { useScreenReady } from "../lib/useScreenReady";
 import { useLogin } from "./auth";
 
 export function Login() {
-  useScreenReady(true); // the form is the screen; ready as soon as it paints
+  useScreenReady(true, "login"); // the form is the screen; ready as soon as it paints
   const login = useLogin();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

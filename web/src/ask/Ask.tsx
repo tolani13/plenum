@@ -105,7 +105,7 @@ export function Ask() {
   const [aiDown, setAiDown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useScreenReady(status.isSuccess || status.isError);
+  useScreenReady(status.isSuccess || status.isError, "ask");
 
   useEffect(() => {
     const focus = () => inputRef.current?.focus();
