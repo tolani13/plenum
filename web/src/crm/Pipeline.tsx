@@ -232,7 +232,7 @@ export function Pipeline() {
   const opps = useOpportunities("all");
   const patch = usePatchStage();
   const navigate = useNavigate();
-  useScreenReady(opps.isSuccess || opps.isError);
+  useScreenReady(opps.isSuccess || opps.isError, "pipeline");
 
   const [dragging, setDragging] = useState<OppRow | null>(null);
   const [overLane, setOverLane] = useState<OppStage | null>(null);

@@ -19,7 +19,7 @@ export function Quotes() {
   const view: View = params.get("tab") === "approvals" ? "approvals" : "mine";
   const navigate = useNavigate();
   const query = useQuotesList(view);
-  useScreenReady(query.isSuccess || query.isError);
+  useScreenReady(query.isSuccess || query.isError, "quotes");
 
   const setView = (v: View) => {
     const p = new URLSearchParams(params);

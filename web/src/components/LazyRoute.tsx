@@ -43,17 +43,58 @@
 // user anything: session and URL both survive it (the MemoryStore is
 // server-side — a reload restarts the page, not the API).
 //
-// The loaders must be module-scope constants, so the memo below is keyed only
-// by the attempt.
+// ── D-4 (2026-07-26): the regression D-3 introduced, and why it happened ───
+//
+// D-3 replaced four distinct lazy() components with FOUR USES OF ONE
+// COMPONENT TYPE. React reconciles by type and position, so navigating from
+// one lazy route to another updated the existing LazyRoute in place instead
+// of mounting a new one — and that turned out to be unsurvivable, for a
+// reason worth writing down because it is not obvious:
+//
+//   A component that suspends never commits that render. React retries it
+//   from the LAST COMMITTED state. The old code built its lazy() inside a
+//   useMemo during render, so every retry recomputed the memo (deps still
+//   differed from the committed ones), produced a BRAND-NEW lazy object,
+//   called import() again, and suspended again — forever.
+//
+// Measured on the real app, one lazy→lazy click: 8 572 renders, 8 572 lazy()
+// creations and 4 286 loader invocations in four seconds, still climbing at
+// 22 506 / 11 253 six seconds later. `memo` equalled `render` exactly — the
+// memo never once hit its cache, which is the signature of a render that
+// never commits. Meanwhile React Router runs navigations in a transition, so
+// <Suspense> kept showing the PREVIOUS screen throughout. The URL was right,
+// no error was thrown, and the user simply saw the wrong screen while the tab
+// spun a hot loop.
+//
+// Two independent fixes, because the bug had two independent causes:
+//
+//   1. IDENTITY. `LazyRoute` keys its inner component on the pathname, so
+//      React sees four distinct instances rather than one shared one. The key
+//      is applied HERE, not by the caller, so a new lazy route cannot forget
+//      it. Pathname cannot collide: React Router matches exactly one route
+//      element for a given pathname, so two different screens can never be at
+//      the same pathname at the same time. It also stops per-route retry
+//      state (`attempt`/`bust`) leaking from one screen onto the next, which
+//      the shared instance did silently.
+//   2. STABILITY. The lazy() is no longer built during render. `lazyFor`
+//      returns the SAME component for the same (loader, bust, attempt), so a
+//      render that never commits can no longer spawn a new one. Even if some
+//      future change re-introduces a non-committing render, the loop cannot
+//      come back — the second call returns the first call's component, whose
+//      promise is already in flight.
+//
+// The loaders must be module-scope constants — `lazyFor` keys off their
+// identity.
 
 import {
   lazy,
   Suspense,
   useCallback,
-  useMemo,
   useState,
   type ComponentType,
+  type LazyExoticComponent,
 } from "react";
+import { useLocation } from "react-router";
 import { ErrorBoundary, describeRenderError, isChunkLoadError } from "./ErrorBoundary";
 import { LoadingPanel } from "./states";
 
@@ -74,6 +115,35 @@ export function screenLoader(
     (bust ? import(/* @vite-ignore */ bust) : importer()).then((m) => ({
       default: (m as Record<string, ComponentType>)[exportName],
     }));
+}
+
+/** Stable lazy components, one per (loader, bust, attempt). Built OUTSIDE
+ *  render on purpose — see the D-4 note above: a suspending render never
+ *  commits, so anything built during render is built again on every retry. */
+const lazyCache = new Map<
+  ScreenLoader,
+  Map<string, LazyExoticComponent<ComponentType>>
+>();
+
+function lazyFor(
+  load: ScreenLoader,
+  bust: string | null,
+  attempt: number,
+): LazyExoticComponent<ComponentType> {
+  let perLoader = lazyCache.get(load);
+  if (!perLoader) {
+    perLoader = new Map();
+    lazyCache.set(load, perLoader);
+  }
+  // `attempt` is part of the identity so the D-3 retry still gets a genuinely
+  // new component even when there is no URL to bust (the Safari fallback).
+  const key = `${attempt}#${bust ?? ""}`;
+  let component = perLoader.get(key);
+  if (!component) {
+    component = lazy(() => load(bust ?? undefined));
+    perLoader.set(key, component);
+  }
+  return component;
 }
 
 /** The module URL the browser named in a failed dynamic import, if it named
@@ -104,17 +174,18 @@ export function LazyRoute({
   load: ScreenLoader;
   name: string;
 }) {
+  // D-4: the identity, applied here so no route can be added without it.
+  const { pathname } = useLocation();
+  return <LazyScreen key={pathname} load={load} name={name} />;
+}
+
+function LazyScreen({ load, name }: { load: ScreenLoader; name: string }) {
   const [{ attempt, bust }, setRetry] = useState<{
     attempt: number;
     bust: string | null;
   }>({ attempt: 0, bust: null });
 
-  // `attempt` is the point of this memo, not an accident: bumping it is what
-  // discards the rejected lazy object and builds a new one.
-  const Screen = useMemo(
-    () => lazy(() => load(bust ?? undefined)),
-    [load, bust, attempt],
-  );
+  const Screen = lazyFor(load, bust, attempt);
 
   const retry = useCallback((error: unknown) => {
     setRetry((prev) => {

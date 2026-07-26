@@ -83,7 +83,7 @@ export function TerritoryMap() {
   const settled =
     (states.isSuccess || states.isError) &&
     (territories.isSuccess || territories.isError);
-  useScreenReady(settled);
+  useScreenReady(settled, "map");
 
   const setUrlParam = (key: string, value: string | null) => {
     const p = new URLSearchParams(params);

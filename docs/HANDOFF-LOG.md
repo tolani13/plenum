@@ -4,6 +4,102 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-07-26 · D-4 — Lazy route to lazy route showed the previous screen
+
+- **Unit:** regression fix. Branch `fix-lazy-nav` from main `1e26947`. Tier 2:
+  client rendering only — no endpoint, scope predicate, write, query, money,
+  secret or identity touched. **This is a regression CC introduced in D-3
+  (`5aff1a4`)**, found by D. in his own browser after the merge and after the
+  live deploy. Live was serving it.
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+
+- **The defect, as D. measured it.** Click a nav link, wait 2.2 s, read the
+  URL and the content together. `eager→eager` fine, `eager→lazy` fine,
+  `lazy→eager` fine, **`lazy→lazy` shows the previous screen** — URL correct,
+  no error, no boundary, no console exception, element count identical at
+  every step. Four of the nine nav destinations are lazy (`/map`, `/leakage`,
+  `/ask`, `/data-quality`), including two the demo path clicks straight
+  through.
+
+- **Root cause, one sentence:** D-3 replaced four distinct `lazy()` components
+  with four uses of ONE component type, so React updated the existing
+  `LazyRoute` in place instead of mounting a new one — and because that
+  component built its `lazy()` inside a `useMemo` **during render**, and a
+  suspending render never commits, every retry recomputed the memo, produced a
+  brand-new `lazy()`, re-imported and suspended again, forever.
+
+- **The architect's hypothesis was right about identity and wrong about the
+  consequence, and the measurement is what separated them.** The prompt
+  offered four candidates: (a) memo not recomputing, (b) recomputing but the
+  child not re-rendering, (c) Suspense holding the previous child, (d) router
+  element identity. Instrumenting `LazyRoute` with render / `lazy()`-creation
+  / loader counters:
+
+  | navigation | renders | `lazy()` created | loader invoked | mounted |
+  |---|---|---|---|---|
+  | eager → lazy (works) | 2 | 2 | 1 | `map` ✓ |
+  | lazy → lazy (broken) | 8 572 | 8 572 | 4 286 | `map` ✗ |
+  | same, 6 s later | 22 506 | 22 506 | 11 253 | `map` ✗ |
+
+  So (a) is false — the memo recomputed 8 572 times; `memo` equalled `render`
+  **exactly**, meaning it never once hit its cache, which is the signature of a
+  render that never commits. (c) is the visible symptom but not the cause:
+  React Router runs navigations in a transition, so `<Suspense>` kept the
+  previous screen on screen while the child suspended — but the child suspended
+  *again on every retry*, so "previous screen" became permanent. It was not a
+  settled wrong state: **an unbounded loop at ~2 800 renders/sec and ~1 400
+  module resolutions/sec, indefinitely** — a wrong screen *and* a hot CPU on
+  the demo machine.
+
+- **The fix, two independent changes for two independent causes:**
+  - **Identity.** `LazyRoute` now keys its inner `LazyScreen` on the pathname.
+    The key is applied INSIDE `LazyRoute`, not by the caller, so a new lazy
+    route cannot forget it. Pathname cannot collide: React Router matches
+    exactly one route element for a given pathname, so two different screens
+    can never be at the same pathname at the same time. This also stops
+    per-route retry state (`attempt`/`bust`) leaking onto the next screen —
+    a latent bug the shared instance was hiding, now covered by its own spec.
+  - **Stability.** `lazy()` is no longer built during render. `lazyFor` is a
+    module-level cache returning the SAME component for the same
+    (loader, bust, attempt), so a render that never commits can no longer
+    spawn a new one. The loop is structurally unreachable, not merely
+    unreached: even if a future change re-introduces a non-committing render,
+    the second call returns the first call's component.
+  - Post-fix, same probe, same click: **2 renders, 1 `lazy()`, 1 loader
+    invocation** — identical to the healthy path — and flat at 6 s.
+
+- **The coverage failure, which mattered as much as the code.** All nine D-3
+  specs passed while the app was visibly broken. Every one of them loaded a
+  route FRESH and asserted on the URL — and the URL was correct the entire
+  time. A test that reads the router cannot see a screen that failed to swap.
+  Fixed at the root: `useScreenReady(ready, screen)` now takes a **required**
+  screen name and writes `body[data-screen]`, so the mounted screen reports
+  itself and a new screen cannot ship without a marker. The D-4 specs navigate
+  rather than load fresh, and assert on that marker, never on the URL.
+- **Evidence.** Red: 12 of 12 lazy→lazy transitions showed the previous
+  screen; `lazy→eager→lazy` passed; the nine-item walk failed only on
+  `Ask → Data Quality`, the one adjacent lazy pair — the pattern visible in
+  the output. Green: all 12 pairs, all 8 eager-in-between legs, the 18-stop
+  nav walk, and the state-leak spec. Full web suite **18/18** twice in a row
+  (tripwire 75 layout + 7 scope, dragproof, honest-errors 3/3, blank-screen
+  13). API untouched and re-proven: clippy clean, `cargo test` 65/0. Build:
+  main bundle **427.81 kB**, under the 500 kB law. **Also verified against the
+  BUILT bundle served by the API's `WEB_DIST` tier** — production React does
+  not double-render under StrictMode, so dev alone would not have been proof:
+  12/12 pairs and the 18-stop walk all pass there too.
+
+- **What D. must still do.** Run the six D-4 acceptance checks (1–5 in dev,
+  6 live), then trigger the Render deploy — autoDeploy is off by design.
+  Cowork can fire the deploy through the Render MCP.
+
+- **Out of scope, reported not fixed:** `/quotes/:id` and `/accounts/:id`
+  render one component type across different params, which is the same
+  *class* of shared identity — but they are eager, so no suspension and no
+  loop is possible, and neither is reachable from the nav. Not exercised by
+  this unit; flagged for whoever touches those screens next.
+
+---
+
 ## 2026-07-26 · D-3 — A blank screen is now unreachable
 
 - **Unit:** defect fix, not a phase. Branch `fix-blank-screen` from main

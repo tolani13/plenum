@@ -103,7 +103,7 @@ function RepsTab({
   kind: Kind;
 }) {
   const query = useLeaderboard(period, kind);
-  useScreenReady(query.isSuccess || query.isError);
+  useScreenReady(query.isSuccess || query.isError, "leaderboards");
   const data: RepX[] = ranked(
     query.data?.items ?? [],
     chain(
@@ -143,7 +143,7 @@ function CustomersTab({
   const accounts = useAccountsList();
   const accountId = (name: string) =>
     accounts.data?.items.find((a) => a.name === name)?.id;
-  useScreenReady(query.isSuccess || query.isError);
+  useScreenReady(query.isSuccess || query.isError, "leaderboards");
   const data: CustomerX[] = ranked(
     query.data?.items ?? [],
     chain(descBasis<CustomerRow>(basis), ascStr((r) => r.account_name)),
@@ -184,7 +184,7 @@ function ItemsTab({
   group: Group;
 }) {
   const query = useItems(period, kind, group);
-  useScreenReady(query.isSuccess || query.isError);
+  useScreenReady(query.isSuccess || query.isError, "leaderboards");
   const data: ItemX[] = ranked(
     query.data?.items ?? [],
     chain(

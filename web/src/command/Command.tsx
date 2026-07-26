@@ -34,7 +34,7 @@ export function Command() {
   const settled = [territories, coverage, summary].every(
     (query) => query.isSuccess || query.isError,
   );
-  useScreenReady(settled);
+  useScreenReady(settled, "command");
 
   const setBasis = (next: string) => {
     const p = new URLSearchParams(params);

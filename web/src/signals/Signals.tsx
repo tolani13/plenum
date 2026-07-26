@@ -251,7 +251,7 @@ export function Signals() {
   const settled =
     (signals.isSuccess || signals.isError) &&
     (summary.isSuccess || summary.isError);
-  useScreenReady(settled);
+  useScreenReady(settled, "signals");
 
   const byLane = useMemo(() => {
     const map = new Map<SignalType, SignalRow[]>();
