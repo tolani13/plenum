@@ -92,9 +92,27 @@ UNTOUCHED by map edits (tested). Canada blocks locked in v1. Seed now
 restores canonical Census geography (demo reset = canon; runtime
 territories + their state rows wiped). Realignment/state-split path:
 docs/territory-realignment-prep.md.
+D-1/D-2 fix merged (branch fix-items-perf from 81eba71): /api/metrics/items
+attach-rate is SET-BASED — `page`/`fits`/`served`/`att` CTEs reading
+v_unit_facts ONCE and v_order_facts ONCE. The old LEFT JOIN LATERAL + per-row
+EXISTS is GONE and must not come back: it drove the planner's cost estimate to
+0.69M–12.05M, past jit_optimize_above_cost/jit_inline_above_cost (500 000), so
+every request LLVM-compiled ~500 functions before executing — 83–97% of a
+34–39 s live response — and three concurrent requests killed the free-tier
+Postgres backends (the typed 500 behind D-2). Post-fix every estimate is
+~20.1k–20.7k, below jit_above_cost (100 000): no plan carries a JIT section.
+COST-ESTIMATE LAW for any new metrics query: if EXPLAIN puts it over 100 000
+on the frozen seed, the shape is wrong — fix the shape, never the knob.
+Scoping unchanged (same security_invoker facts views, same rls_tx); 53
+response bodies byte-identical before/after. Client failure honesty: api.ts
+exports NetworkError + describeError, and ErrorPanel names the server's typed
+code/message — ONLY a transport failure may say the API was unreachable; its
+no-argument default is cause-agnostic. Ten other ErrorPanel call sites still
+pass no error (reported, not fixed — one line each).
 Tripwire is now 75 layout (15 screens × 5 widths) + 7 scope
 (command/pipeline/signals/leakage/map — map = no foreign-territory dollars
-in a rep's DOM — plus rep AND manager zero-edit-affordance on /map).
+in a rep's DOM — plus rep AND manager zero-edit-affordance on /map) + 3
+honest-error specs (web/honest-errors.spec.ts).
 Metrics layer: plenum_app has NO grant on raw mv_* rollups; all metric reads
 go through security_invoker facts views or scoped views carrying the
 v_user_scope fail-closed predicate; refresh only via refresh_rollups()

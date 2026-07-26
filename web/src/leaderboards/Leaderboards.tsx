@@ -42,12 +42,16 @@ type Status = "loading" | "error" | "empty" | "ready";
 function TabPanel({
   status,
   count,
+  error,
   onRetry,
   onExport,
   children,
 }: {
   status: Status;
   count: number;
+  // D-2: the failure travels to the panel, so the alarm line can name the
+  // server's typed code and message instead of asserting a network problem.
+  error: unknown;
   onRetry: () => void;
   onExport: () => void;
   children: React.ReactNode;
@@ -69,7 +73,7 @@ function TabPanel({
         </button>
       </div>
       {status === "loading" && <LoadingPanel label="Loading table" />}
-      {status === "error" && <ErrorPanel onRetry={onRetry} />}
+      {status === "error" && <ErrorPanel onRetry={onRetry} error={error} />}
       {status === "empty" && (
         <EmptyPanel message="No rows in scope for this period." />
       )}
@@ -113,6 +117,7 @@ function RepsTab({
     <TabPanel
       status={statusOf(query.isPending, query.isError, data.length)}
       count={data.length}
+      error={query.error}
       onRetry={() => query.refetch()}
       onExport={() =>
         downloadCsv(csvFilename("reps", period, basis, kind), repCsv, data)
@@ -148,6 +153,7 @@ function CustomersTab({
     <TabPanel
       status={statusOf(query.isPending, query.isError, data.length)}
       count={data.length}
+      error={query.error}
       onRetry={() => query.refetch()}
       onExport={() =>
         downloadCsv(
@@ -193,6 +199,7 @@ function ItemsTab({
     <TabPanel
       status={statusOf(query.isPending, query.isError, data.length)}
       count={data.length}
+      error={query.error}
       onRetry={() => query.refetch()}
       onExport={() =>
         downloadCsv(
