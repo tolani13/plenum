@@ -155,6 +155,25 @@ their own lazy chunk (982 kB) — main stays 428 kB. TAILWIND v4 GOTCHA, measure
 emits ONLY variables some utility class references, so tokens read from JS alone are
 tree-shaken to "" — the collector's 3D material tokens live in a plain :root block in
 tokens.css, not in @theme (in @theme the whole unit rendered white).
+- cad/ holds parametric collector geometry (build123d/OpenCASCADE). It is the
+  dimensional source of truth. Three.js collector geometry is presentation only
+  and must not diverge from cad/params.py.
+CAD-01 detail: one CollectorParams dataclass builds BOTH cartridge
+orientations — downflow (horizontal cartridges off a vertical tube sheet,
+inlet ABOVE all media) and crossflow (vertical cartridges hung from a
+horizontal tube sheet, inlet BELOW all media) — and exports .step (B-rep) +
+.glb (web mesh) for each into cad/out/, committed. PYTHON NEVER ENTERS THE
+SHIP PATH: Dockerfile, render.yaml and scripts/check.sh are untouched, the
+Render image gains no Python layer, CI gains no Python step; cad/.venv/ is
+git-ignored and the artifacts are committed files, exactly like
+web/src/map/blank-us-map-states-only.svg. PARAMETER LAW: a bare number inside
+a geometry function is a defect — every dimension arrives on CollectorParams.
+mm throughout; z=0 is the hopper discharge face, so overall height ==
+housing_height + hopper_height. Pleats are deliberately NOT modelled (face
+count, no consumer yet) — media area is the parameter cartridge_media_area_m2.
+The -Y wall is omitted (housing_cutaway) so the bank is visible in a viewer;
+extents are unchanged by it. Wiring the .glb into the app, and the 982 kB
+chunk, are CAD-02.
 Metrics layer: plenum_app has NO grant on raw mv_* rollups; all metric reads
 go through security_invoker facts views or scoped views carrying the
 v_user_scope fail-closed predicate; refresh only via refresh_rollups()

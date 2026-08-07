@@ -4,3 +4,9 @@ node_modules/
 *.log
 rep.txt
 vp.txt
+
+# CAD-01 · the local Python authoring venv and its caches. The venv is never
+# committed; cad/out/ IS committed (generated artifacts, like the map SVG).
+cad/.venv/
+__pycache__/
+.pytest_cache/
