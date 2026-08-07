@@ -116,6 +116,14 @@ class CollectorParams:
     # Outlet centreline measured down from the housing top.
     outlet_top_clearance: float = 250.0
 
+    # ── export ───────────────────────────────────────────────────────────
+    # STEP writes a timestamp into its FILE_NAME header. Left to wall clock,
+    # every rebuild produces a different file and dirties the repo for no
+    # geometric reason, which makes `git status` useless as a signal that the
+    # artifacts are stale. Pinning it makes a rebuild byte-identical unless a
+    # dimension actually changed. Not a dimension of the machine.
+    step_timestamp: str = "2026-08-07T00:00:00"
+
     # ── boolean hygiene ──────────────────────────────────────────────────
     # Overshoot applied to cutting tools so a subtraction never leaves a
     # zero-thickness coincident face. Not a dimension of the machine.

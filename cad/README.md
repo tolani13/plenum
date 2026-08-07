@@ -38,6 +38,11 @@ cad/.venv/Scripts/python -m pytest cad/test_geometry.py -v
 Change a number in `cad/params.py`, re-run `build.py`, and all four artifacts
 in `out/` change accordingly.
 
+A rebuild that changed no dimension is **byte-identical** — the STEP header
+timestamp is pinned from `params.step_timestamp` rather than the wall clock,
+so a dirty `cad/out/` in `git status` means the artifacts are genuinely stale,
+never that you re-ran the build.
+
 ## Files
 
 | File | What it is |

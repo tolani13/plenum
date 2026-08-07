@@ -64,12 +64,18 @@ GEOMETRIES = (
 )
 
 
-def export_one(assembly: Compound, name: str, out_dir: Path) -> list[Path]:
-    """Write `<name>.step` and `<name>.glb`; return the paths written."""
+def export_one(
+    assembly: Compound, name: str, out_dir: Path, p: CollectorParams
+) -> list[Path]:
+    """Write `<name>.step` and `<name>.glb`; return the paths written.
+
+    The STEP timestamp is pinned from the parameter set so a rebuild that
+    changed no dimension produces byte-identical files.
+    """
     step_path = out_dir / f"{name}.step"
     glb_path = out_dir / f"{name}.glb"
 
-    if not export_step(assembly, step_path, unit=Unit.MM):
+    if not export_step(assembly, step_path, unit=Unit.MM, timestamp=p.step_timestamp):
         raise RuntimeError(f"export_step reported failure for {step_path}")
     if not export_gltf(assembly, glb_path, unit=Unit.MM, binary=True):
         raise RuntimeError(f"export_gltf reported failure for {glb_path}")
@@ -126,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
             f"Y {bbox.min.Y:.3f}..{bbox.max.Y:.3f}  "
             f"Z {bbox.min.Z:.3f}..{bbox.max.Z:.3f}"
         )
-        for path in export_one(assembly, name, out_dir):
+        for path in export_one(assembly, name, out_dir, p):
             written.append(path)
             print(f"{'':<10} wrote: {path.name:<16} {path.stat().st_size:>10,} bytes")
         print()
