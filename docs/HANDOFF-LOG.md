@@ -16,7 +16,7 @@ as the authority for collector dimensions.
 Deferred: pleat geometry (face-count cost, no consumer yet); Three.js wiring
 and chunk-splitting (unit CAD-02); airflow field (unlabeled illustrative only
 until a validated solver run exists).
-Merge: <hash> <timestamp>
+Merge: f5595d2 2026-08-07 20:45:07 -0400
 
 - **Unit:** new local authoring toolchain plus committed artifacts. Tier 2
   (logic/feature). **No security surface:** this unit adds no endpoint, no
@@ -84,6 +84,17 @@ Merge: <hash> <timestamp>
   D-1/D-2, D-3, D-4 and B-1 all merged — later than the README claims. The
   HANDOFF-LOG and CLAUDE.md are current; only the README lags. Not edited in
   this unit, per instruction.
+- **Commits:** `23cb74b` (the module, artifacts and docs) and `f533f2d` (pin
+  the STEP header timestamp so a rebuild is byte-identical — export_step
+  otherwise stamps wall-clock time and every build rewrote both .step files
+  with no geometric change, making a dirty cad/out/ meaningless as a staleness
+  signal) on `feat/cad-geometry-01`.
+- **Merge record:** `f5595d2` — feat/cad-geometry-01 merged to main (--no-ff),
+  2026-08-07 20:45:07 -0400, on D.'s literal "merge" (merge = approval per
+  this unit's pre-authorized PHASE 2). `origin/main` was confirmed unchanged
+  at `cfd1cd9` immediately before the merge; pushed cfd1cd9..f5595d2. The
+  live Render service is unaffected: `autoDeploy: false`, and the image build
+  reads no file this unit touched.
 
 ## 2026-07-26 · B-1 — The collector demo, ported into PLENUM at /collector
 
