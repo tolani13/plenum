@@ -4,6 +4,87 @@ One entry per build unit. Newest first.
 
 ---
 
+## 2026-08-07 — CAD-01: parametric collector geometry pipeline
+Branch: feat/cad-geometry-01
+Added cad/ module: build123d parametric source for two collector geometries
+(downflow/horizontal cartridges, crossflow/vertical cartridges) from a shared
+parameter dataclass. Exports STEP (B-rep, CAD interchange) and GLB (web mesh)
+for each. No app integration — artifacts committed as files only.
+Rationale: geometry becomes a single dimensioned source of truth feeding both
+the browser demo and desktop CAD use. Replaces hand-authored Three.js primitives
+as the authority for collector dimensions.
+Deferred: pleat geometry (face-count cost, no consumer yet); Three.js wiring
+and chunk-splitting (unit CAD-02); airflow field (unlabeled illustrative only
+until a validated solver run exists).
+Merge: <hash> <timestamp>
+
+- **Unit:** new local authoring toolchain plus committed artifacts. Tier 2
+  (logic/feature). **No security surface:** this unit adds no endpoint, no
+  auth path, no tenancy or RLS interaction, no user input, no external data
+  fetch, no query, no secret, and no money. It touches no Rust crate and no
+  file under `web/`. Stating that explicitly rather than skipping the
+  section.
+- **Architect:** Claude (Cowork) · **Builder:** CC (Claude Code)
+- **Branch point:** main `cfd1cd9`.
+
+- **PYTHON-STAYS-OUT-OF-THE-SHIP-PATH LAW (constraint 10).** `Dockerfile`,
+  `render.yaml` and `scripts/check.sh` are untouched — proven by an empty
+  `git diff --stat main -- Dockerfile render.yaml scripts/check.sh`. The
+  Render image gains no Python layer; the CI gauntlet gains no Python step.
+  The CAD toolchain is a LOCAL authoring tool whose outputs are committed
+  artifacts, following the precedent set by
+  `web/src/map/blank-us-map-states-only.svg`. `cad/.venv/` is git-ignored;
+  `cad/out/` is committed.
+
+- **Shipped.** `cad/params.py` (frozen dataclass, every dimension + validation
+  + derived geometry + `expected_bounds()`), `cad/common.py` (housing shell,
+  hopper loft, vertical/horizontal tube sheets, rectangular inlet duct, round
+  outlet duct, cartridge grid), `cad/downflow.py` (Geometry A),
+  `cad/crossflow.py` (Geometry B), `cad/build.py` (CLI → four artifacts),
+  `cad/test_geometry.py` (20 tests), `cad/README.md`, `cad/requirements.txt`,
+  `.gitignore` additions, and the four artifacts in `cad/out/`.
+- **PARAMETER LAW (constraint 9):** no dimension appears inside a geometry
+  function. `common.py`, `downflow.py` and `crossflow.py` contain only
+  indices, halves, the 90° rotations that lay a cylinder on its side, and one
+  named `cut_epsilon` (itself a parameter) for boolean hygiene. Every solid
+  dimension arrives on the `CollectorParams` instance.
+- **The two geometries are defined by inlet elevation relative to the media,
+  and that is ASSERTED, not assumed.** `test_downflow_inlet_is_above_all_media`
+  measures the built inlet duct's bore against the topmost cartridge's upper
+  surface; `test_crossflow_inlet_is_below_all_media` does the mirror. Both
+  read bounding boxes off labelled leaves of the assembly compound rather
+  than re-deriving the arithmetic under test.
+- **Units and origin:** millimetres, `Unit.MM` written into both formats.
+  z = 0 is the hopper discharge face, so overall height is exactly
+  `housing_height + hopper_height` (3300 mm at the shipped parameters) —
+  D.'s acceptance check 2, also asserted as a test.
+- **Cutaway:** the `-Y` housing wall is omitted (`housing_cutaway`, a
+  parameter) so the cartridge bank is visible in a mesh viewer — without it
+  D.'s acceptance check 4 could not be performed. The roof and hopper rim
+  still span the full depth, so the assembly's extents are unchanged.
+- **Deps added (local venv only, never the repo or the image):** build123d
+  0.11.1 (Apache-2.0), cadquery-ocp-novtk / cadquery-ocp-proxy 7.9.3.1.1
+  (Apache-2.0 metadata; the bound OpenCASCADE 7.9.3 kernel is LGPL-2.1 with
+  the Open CASCADE Exception upstream — the wheels ship no license file, so
+  that is recorded from upstream, not verified from disk), pytest 9.1.1
+  (MIT). Table in `cad/README.md` and in `cad/build.py`'s docstring.
+- **Checks status (internal, output pasted in the session report):**
+  20/20 pytest pass · `python cad/build.py` writes four non-zero files ·
+  measured bbox of BOTH assemblies = X -1150..1150, Y -750..750, Z 0..3300,
+  identical to `expected_bounds()` to within 0.1 mm · cartridge count 8/8 ·
+  halving `cartridge_count` changes count and volume in both geometries ·
+  `git diff --stat main -- Dockerfile render.yaml scripts/check.sh` EMPTY.
+- **Out-of-scope observations (reported, not fixed):** README phase-state
+  discrepancy (see below); the Three.js collector's dimensions do not
+  correspond to `cad/params.py` and reconciling them is CAD-02.
+- **Report, do not fix — README phase state.** `README.md` states "Phase
+  state: P0–P4 merged; P5 (polish + Territory Map + Leakage + Data Quality +
+  signal auto-expiry) built on `p5-polish-map`." Actual `git log` on
+  `main` at branch point is `cfd1cd9`, with P5, the Render deploy, T1,
+  D-1/D-2, D-3, D-4 and B-1 all merged — later than the README claims. The
+  HANDOFF-LOG and CLAUDE.md are current; only the README lags. Not edited in
+  this unit, per instruction.
+
 ## 2026-07-26 · B-1 — The collector demo, ported into PLENUM at /collector
 
 - **Unit:** new product surface, first of two bridge units. Branch

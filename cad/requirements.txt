@@ -1,0 +1,9 @@
+# CAD-01 authoring toolchain. LOCAL ONLY — Python never enters the ship path
+# (no Docker layer, no CI step). See cad/README.md for licenses.
+#
+#   py -3.13 -m venv cad/.venv
+#   cad/.venv/Scripts/python -m pip install -r cad/requirements.txt
+#
+# Pinned to the versions this unit was built and verified against.
+build123d==0.11.1   # Apache-2.0; pulls cadquery-ocp (OpenCASCADE 7.9.3)
+pytest==9.1.1       # MIT; test runner

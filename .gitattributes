@@ -2,3 +2,8 @@
 *.sh text eol=lf
 *.sql text eol=lf
 *.rs text eol=lf
+*.py text eol=lf
+# CAD-01 artifacts: STEP is text (ISO-10303-21), GLB is binary and must never
+# be line-ending normalised.
+*.step text eol=lf
+*.glb binary
